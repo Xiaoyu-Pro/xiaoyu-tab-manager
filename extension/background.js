@@ -11,7 +11,6 @@ importScripts(
   'services/storage-service.js',
   'services/tabs-service.js',
   'services/tab-reuse.js',
-  'services/dashboard-cleanup.js',
   'services/search-service.js',
   'services/tools-service.js'
 );
@@ -237,13 +236,13 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && self.XiaoyuTabReuse.ENABLED_KEY in changes) tabReuse.reset();
 });
 // 所有仪表盘共用同一后台队列，避免每个页面各自删除造成互相关闭。
-const dashboardCleanup = self.XiaoyuDashboardCleanup.createController(chrome);
+const dashboardCleanup = self.SuperTabOutTabs.createDashboardCleanupController(chrome);
 chrome.tabs.onCreated.addListener(dashboardCleanup.onCreated);
 chrome.tabs.onUpdated.addListener(dashboardCleanup.onUpdated);
 chrome.tabs.onRemoved.addListener(dashboardCleanup.onRemoved);
 chrome.tabs.onReplaced.addListener((_addedId, removedId) => dashboardCleanup.onRemoved(removedId));
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && self.XiaoyuDashboardCleanup.ENABLED_KEY in changes) dashboardCleanup.cancel();
+  if (area === 'local' && self.SuperTabOutTabs.DASHBOARD_CLEANUP_KEY in changes) dashboardCleanup.cancel();
 });
 chrome.commands.onCommand.addListener(async (command) => {
   if (command === 'open-side-panel') {

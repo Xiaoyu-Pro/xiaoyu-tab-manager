@@ -5249,8 +5249,7 @@ document.addEventListener('keydown', async (e) => {
    INITIALIZE
    ---------------------------------------------------------------- */
 initSettingsPanelLayout();
-window.XiaoyuTabReuseSettings?.init({ translate: tr, selectView: setSettingsView });
-window.XiaoyuDashboardCleanupSettings?.init({ translate: tr, onEnabledChange: enabled => {
+window.XiaoyuTabReuseSettings?.init({ translate: tr, selectView: setSettingsView, onDashboardCleanupChange: enabled => {
   if (automaticDashboardCleanupEnabled !== enabled) automaticDashboardCleanupFailed = false;
   automaticDashboardCleanupEnabled = enabled;
   checkTabOutDupes();

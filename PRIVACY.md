@@ -36,7 +36,7 @@ Xiaoyu Tab Manager stores the following data locally on the user's device:
 - local tool favorites, recent tools, and small per-tool draft state
 - privacy mode state and privacy screen settings
 - selected view mode
-- dashboard auto-merge preference (off by default); session-only tab IDs, creation order, and verified-dashboard flags used to coordinate safe duplicate-dashboard cleanup, without storing URLs or titles in that state
+- dashboard auto-merge preference (off by default)
 - work names, ordering, and exact-page assignments stored as SHA-256 URL keys
 - current-session tab-to-work assignments and the most recent window-operation undo snapshot
 - selected language
@@ -92,7 +92,7 @@ Xiaoyu Tab Manager requests the following extension permissions:
 
 **Reuse identical tabs** compares URLs locally and shows a short message in Chrome's toolbar after a successful switch. It does not request system notification or website permissions. The message contains no page titles, URLs, or query parameters, and the feature does not persist matched URLs.
 
-**Automatically merge Xiaoyu pages** is a separate, opt-in setting. It only closes confirmed, unpinned Xiaoyu dashboards in non-incognito normal windows when a dashboard loads; it does not close ordinary web pages, Tools, Side Panel, other extensions, or Blue. Temporary coordination state uses `chrome.storage.session`, contains only tab IDs, order numbers, and verification flags, and is not uploaded. Closing an old dashboard loses any unsaved input in it and may close a window whose only tab was that dashboard.
+**Automatically merge Xiaoyu pages** is a separate, opt-in setting. It only closes confirmed, unpinned Xiaoyu dashboards in non-incognito normal windows when a dashboard loads; it does not close ordinary web pages, Tools, Side Panel, other extensions, or Blue. Temporary coordination state contains only tab IDs, order numbers, and verification flags in background memory; it resets when the background worker restarts and is not uploaded. Closing an old dashboard loses any unsaved input in it and may close a window whose only tab was that dashboard.
 
 The extension requests only the permissions needed for its stated tab-dashboard purpose.
 

@@ -3,15 +3,14 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
-const { createController, ENABLED_KEY, SESSION_KEY } = require('../extension/services/dashboard-cleanup.js');
+const { createDashboardCleanupController: createController, DASHBOARD_CLEANUP_KEY: ENABLED_KEY } = require('../extension/services/tabs-service.js');
 const DASHBOARD = 'chrome-extension://xiaoyu/index.html';
 
 /** 构造独立普通窗口及受保护页，所有关闭均可检查，不访问真实浏览器。 */
 function fixture(enabled = true) {
   const local = { [ENABLED_KEY]: enabled };
-  const session = {};
   const calls = [];
-  const state = { failWrite: false, failRemove: false, beforeGet: null };
+  const state = { failRead: false, failRemove: false, beforeGet: null };
   const windows = new Map([[1, { type: 'normal' }], [2, { type: 'normal' }],
     [3, { type: 'normal', incognito: true }], [4, { type: 'popup' }]]);
   const tabs = new Map([
@@ -28,11 +27,7 @@ function fixture(enabled = true) {
   const api = {
     runtime: { id: 'xiaoyu', getURL: path => `chrome-extension://xiaoyu/${path}` },
     storage: {
-      local: { get: async key => ({ [key]: local[key] }) },
-      session: {
-        get: async key => ({ [key]: structuredClone(session[key]) }),
-        set: async values => { if (state.failWrite) throw new Error('session unavailable'); Object.assign(session, structuredClone(values)); },
-      },
+      local: { get: async key => { if (state.failRead) throw new Error('storage unavailable'); return { [key]: local[key] }; } },
     },
     tabs: {
       query: async () => [...tabs.values()].filter(tab => windows.get(tab.windowId)?.type === 'normal').map(tab => ({ ...tab })),
@@ -43,7 +38,7 @@ function fixture(enabled = true) {
   };
   const logs = [];
   const logger = { info: (...args) => logs.push(args), warn: (...args) => logs.push(args) };
-  return { api, tabs, windows, local, session, calls, state, logs, run: createController(api, { log: logger }) };
+  return { api, tabs, windows, local, calls, state, logs, run: createController(api, { log: logger }) };
 }
 
 /** 为真实仪表盘构造不可由普通网页伪造的扩展消息来源。 */
@@ -68,7 +63,6 @@ async function testModesAndScope() {
   assert.deepEqual(f.calls, [1]);
   assert.equal(f.tabs.has(2), true);
   assert.equal(f.tabs.size, 8);
-  assert.doesNotMatch(JSON.stringify(f.session), /https?:|chrome-extension:|example\.test/);
   assert.doesNotMatch(JSON.stringify(f.logs), /https?:|chrome-extension:|example\.test/);
   for (const untrusted of [sender(2, 'https://example.test/'), sender(2, 'chrome-extension://blue/index.html'),
     { ...sender(2), id: 'other' }, { ...sender(2), tab: undefined }]) {
@@ -76,7 +70,7 @@ async function testModesAndScope() {
   }
 }
 
-/** 较新页尚未就绪时不删除它；旧页晚到及 worker 重启不改变创建优先级。 */
+/** 较新页尚未就绪时不删除它；当前后台内旧页晚到不改变创建优先级。 */
 async function testOrdering() {
   const f = fixture();
   await f.run.onCreated(f.tabs.get(1));
@@ -86,8 +80,7 @@ async function testOrdering() {
   f.state.failRemove = true;
   assert.equal((await f.run.onReady(sender(2))).ok, false);
   f.state.failRemove = false;
-  const resumed = createController(f.api, { log: { info() {}, warn() {} } });
-  await resumed.onReady(sender(1));
+  await f.run.onReady(sender(1));
   assert.deepEqual(f.calls, [1]);
   assert.equal(f.tabs.has(2), true);
 }
@@ -113,14 +106,13 @@ async function testPlaceholderProof() {
   assert.deepEqual(g.calls, []);
 }
 
-/** 存储、目标、开关和保留页变更时不冒险继续关闭。 */
+/** 设置读取失败，或目标、开关和保留页变更时不冒险继续关闭。 */
 async function testFailureAndRechecks() {
-  for (const scenario of ['write', 'invalid-state', 'keeper-gone', 'keeper-gone-late', 'target-navigated', 'target-pinned', 'target-popup', 'disabled']) {
+  for (const scenario of ['read', 'keeper-gone', 'keeper-gone-late', 'target-navigated', 'target-pinned', 'target-popup', 'disabled']) {
     const f = fixture();
     await f.run.onCreated(f.tabs.get(1));
     await f.run.onCreated(f.tabs.get(2));
-    if (scenario === 'write') f.state.failWrite = true;
-    if (scenario === 'invalid-state') f.session[SESSION_KEY] = { version: 9 };
+    if (scenario === 'read') f.state.failRead = true;
     f.state.beforeGet = id => {
       if (scenario === 'keeper-gone' && id === 2) f.tabs.delete(2);
       if (id !== 1) return;
@@ -156,7 +148,7 @@ async function testConcurrentCreation() {
   assert.equal(f.tabs.has(10), true);
 }
 
-/** 运行本功能的后台边界、并发、恢复与错误路径测试。 */
+/** 运行本功能的后台边界、并发与错误路径测试。 */
 export async function testDashboardCleanup() {
   await testModesAndScope();
   await testOrdering();

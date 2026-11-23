@@ -9,6 +9,7 @@
     'brave://newtab/',
     'about:newtab',
   ];
+  const DASHBOARD_CLEANUP_KEY = 'dashboardAutoCleanupEnabled';
 
   const CHROME_GROUP_COLORS = new Set([
     'grey',
@@ -296,6 +297,112 @@
     return toClose;
   }
 
+  /** 后台串行合并仪表盘；临时顺序和身份只保存在当前 worker 内。 */
+  function createDashboardCleanupController(chromeApi, { log = console } = {}) {
+    const dashboardUrl = chromeApi.runtime.getURL('index.html');
+    const tabs = new Map();
+    let sequence = 0;
+    let generation = 0;
+    let pending = Promise.resolve();
+
+    /** 只识别本扩展的仪表盘入口，允许其查询参数和片段。 */
+    function isDocument(url) {
+      return typeof url === 'string' && (url === dashboardUrl || url.startsWith(`${dashboardUrl}?`) || url.startsWith(`${dashboardUrl}#`));
+    }
+
+    /** 通用新标签地址必须有页面就绪证明，挂起其他导航的页不参与。 */
+    function isDashboard(tab) {
+      return Number.isInteger(tab?.id) && !tab.incognito && !tab.pinned
+        && (!tab.pendingUrl || tab.pendingUrl === tab.url)
+        && (isDocument(tab.url) || ((isBrowserNewTabUrl(tab.url) || tab.url === 'chrome://new-tab-page/') && tabs.get(tab.id)?.verified));
+    }
+
+    /** 只读取严格开启的本地设置，不修改设置或会话存储。 */
+    async function enabled() {
+      return (await chromeApi.storage.local.get(DASHBOARD_CLEANUP_KEY))[DASHBOARD_CLEANUP_KEY] === true;
+    }
+
+    /** 删除前重新核验窗口类型，排除隐身与弹出窗口。 */
+    async function isNormal(tab) {
+      const window = await chromeApi.windows.get(tab.windowId);
+      return window.type === 'normal' && !window.incognito;
+    }
+
+    /** 同步记录创建顺序，并中断旧清理轮次以保护新页。 */
+    function onCreated(tab) {
+      if (!Number.isInteger(tab?.id) || tab.incognito || tab.pinned) return;
+      generation++;
+      tabs.set(tab.id, { order: ++sequence, verified: false });
+    }
+
+    /** 导航时立即失效旧文档证明，不将刷新当作新建。 */
+    function onUpdated(id, changes) {
+      if (changes.status !== 'loading' && !('url' in changes)) return;
+      generation++;
+      if (tabs.has(id)) tabs.get(id).verified = false;
+    }
+
+    /** 删除已关闭标签的临时记录。 */
+    function onRemoved(id) { tabs.delete(id); }
+
+    /** 设置变化只中断清理，不立即发起关闭。 */
+    function cancel() { generation++; }
+
+    /** 保留页消失、导航或受保护时终止，不能清空全部仪表盘。 */
+    async function keeperExists(id) {
+      try {
+        const tab = await chromeApi.tabs.get(id);
+        return isDashboard(tab) && await isNormal(tab);
+      } catch { return false; }
+    }
+
+    /** 验证就绪页，再逐个关闭旧仪表盘；后台重启后以本次确认的页面为起点。 */
+    async function cleanup(sender, revision) {
+      const current = await chromeApi.tabs.get(sender.tab.id);
+      const configured = await enabled();
+      if (revision !== generation) return { ok: true, enabled: configured, closed: 0, deferred: true };
+      if (current.pinned || current.incognito || !await isNormal(current)
+        || (!isDocument(current.url) && !isBrowserNewTabUrl(current.url) && current.url !== 'chrome://new-tab-page/')
+        || (current.pendingUrl && current.pendingUrl !== current.url)) return { ok: true, enabled: configured, closed: 0 };
+      if (revision !== generation) return { ok: true, enabled: configured, closed: 0, deferred: true };
+      if (!tabs.has(current.id)) tabs.set(current.id, { order: ++sequence });
+      tabs.get(current.id).verified = true;
+      if (!configured) return { ok: true, enabled: false, closed: 0 };
+      const candidates = (await chromeApi.tabs.query({ windowType: 'normal' })).filter(isDashboard);
+      candidates.sort((a, b) => (tabs.get(b.id)?.order || 0) - (tabs.get(a.id)?.order || 0));
+      const keeper = candidates[0];
+      if (!keeper || !tabs.get(keeper.id)?.verified) return { ok: true, enabled: true, closed: 0, deferred: true };
+      let closed = 0;
+      let failed = 0;
+      for (const candidate of candidates) {
+        if (candidate.id === keeper.id) continue;
+        let fresh;
+        try { fresh = await chromeApi.tabs.get(candidate.id); } catch { continue; }
+        if (!isDashboard(fresh) || !await isNormal(fresh)) continue;
+        if (!await keeperExists(keeper.id)) return { ok: false, enabled: true, closed, reason: 'keeper-changed' };
+        if (revision !== generation || !await enabled() || revision !== generation) break;
+        try { await chromeApi.tabs.remove(fresh.id); closed++; }
+        catch { failed++; log.warn('[Xiaoyu dashboard cleanup] Tab kept after close failure', { tabId: fresh.id }); }
+      }
+      log.info('[Xiaoyu dashboard cleanup] Finished', { keeperId: keeper.id, closed, failed });
+      return { ok: failed === 0, enabled: true, closed };
+    }
+
+    /** 只接受本扩展仪表盘消息，并隔离失败以便后续请求继续处理。 */
+    function onReady(sender) {
+      if (sender?.id !== chromeApi.runtime.id || !isDocument(sender.url) || !Number.isInteger(sender.tab?.id)) {
+        return Promise.resolve({ ok: false, reason: 'untrusted-sender' });
+      }
+      const revision = generation;
+      pending = pending.then(() => cleanup(sender, revision)).catch(() => {
+        log.warn('[Xiaoyu dashboard cleanup] Browser or storage operation failed');
+        return { ok: false, reason: 'operation-failed' };
+      });
+      return pending;
+    }
+    return { onCreated, onUpdated, onRemoved, onReady, cancel };
+  }
+
   async function groupTabs(tabIds, options = {}) {
     const chromeApi = getChromeApi();
     if (!chromeApi?.tabs || !chromeApi?.tabGroups || !tabIds?.length) return null;
@@ -459,6 +566,8 @@
     focusTab,
     closeDuplicateTabs,
     closeTabOutDupes,
+    DASHBOARD_CLEANUP_KEY,
+    createDashboardCleanupController,
     groupTabs,
     updateGroup,
     ungroupTabs,
