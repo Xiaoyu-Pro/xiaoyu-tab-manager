@@ -47,6 +47,8 @@ export function testPackageContract() {
     'services/shortcut-tabs.js',
     'views/shortcut-library-view.js',
     'views/keyword-search.js',
+    'services/dashboard-cleanup.js',
+    'views/dashboard-cleanup-settings.js',
   ]) {
     assert.equal(EXTENSION_PACKAGE_FILES.includes(file), true, file);
   }

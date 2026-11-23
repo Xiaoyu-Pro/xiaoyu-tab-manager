@@ -164,6 +164,7 @@ function checkHtmlEntrypoints() {
     'services/shortcut-tabs.js',
     'services/tabs-service.js',
     'services/tab-reuse.js',
+    'services/dashboard-cleanup.js',
     'services/workspace-service.js',
     'services/workspace-planner.js',
     'services/workspace-operations.js',
@@ -176,6 +177,7 @@ function checkHtmlEntrypoints() {
     'views/window-view.js',
     'views/shortcut-library-view.js',
     'views/tab-reuse-settings.js',
+    'views/dashboard-cleanup-settings.js',
     'views/keyword-search.js',
   ]);
   checkHtmlResources('sidepanel.html', [

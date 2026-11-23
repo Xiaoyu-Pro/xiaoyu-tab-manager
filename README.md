@@ -73,6 +73,8 @@ The top-right controls are intentionally compact:
 - **Lock**: toggles privacy mode.
 - **Settings**: opens language, theme, type, and privacy-screen options.
 
+**Settings → Tabs → Automatically merge Xiaoyu pages** optionally keeps only one dashboard. It is off by default. Starting with the next dashboard load, it keeps the newest-created Xiaoyu dashboard and closes other unpinned dashboards in normal windows. Turning the setting on does not immediately close existing pages; turning it off restores the original prompt and manual button. Web pages, other extensions, Blue, incognito, and pinned tabs are not automatically closed. Unsaved input in old dashboards is lost, and a window containing only an old dashboard may close. This setting is independent of identical-webpage URL reuse.
+
 Available themes:
 
 | Theme | Tone |

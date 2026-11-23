@@ -241,6 +241,15 @@
           </label>
           <p class="tab-reuse-setting-note" id="tabReuseHelp" data-i18n="tabReuseHelp">If a new foreground tab matches a page already open, Xiaoyu switches to it, closes the duplicate, and shows a brief toolbar message.</p>
           <p class="tab-reuse-setting-note" id="tabReuseStatus" role="status" data-i18n="tabReuseOff">Off</p>
+          <label class="privacy-setting-row">
+            <span data-i18n="dashboardAutoCleanupLabel">Automatically merge Xiaoyu pages</span>
+            <span class="privacy-setting-switch">
+              <input type="checkbox" id="dashboardAutoCleanupEnabled" aria-describedby="dashboardAutoCleanupHelp dashboardAutoCleanupStatus" disabled>
+              <span class="privacy-setting-switch-track" aria-hidden="true"></span>
+            </span>
+          </label>
+          <p class="tab-reuse-setting-note" id="dashboardAutoCleanupHelp" data-i18n="dashboardAutoCleanupHelp">Off by default. From the next dashboard load, keep the newest Xiaoyu page and close other unpinned dashboard pages. Unsaved input will be lost; windows containing only an old dashboard may close.</p>
+          <p class="tab-reuse-setting-note" id="dashboardAutoCleanupStatus" role="status" data-i18n="tabReuseOff">Off</p>
         </div>
 
         <div class="settings-pane" id="settingsPanePrivacy" data-settings-pane="privacy" role="tabpanel" aria-labelledby="settingsTabPrivacy">
@@ -528,6 +537,7 @@
 <script src="services/shortcut-tabs.js"></script>
 <script src="services/tabs-service.js"></script>
 <script src="services/tab-reuse.js"></script>
+<script src="services/dashboard-cleanup.js"></script>
 <script src="services/workspace-service.js"></script>
 <script src="services/workspace-planner.js"></script>
 <script src="services/workspace-operations.js"></script>
@@ -540,6 +550,7 @@
 <script src="views/window-view.js"></script>
 <script src="views/shortcut-library-view.js"></script>
 <script src="views/tab-reuse-settings.js"></script>
+<script src="views/dashboard-cleanup-settings.js"></script>
 <script src="views/keyword-search.js"></script>
 <script src="sidepanel.js"></script>
 

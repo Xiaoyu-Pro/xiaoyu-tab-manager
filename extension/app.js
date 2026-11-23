@@ -29,6 +29,8 @@ const OrganizationNav = window.SuperTabOutOrganizationNav;
 const WorkspaceView = window.SuperTabOutWorkspaceView;
 const WindowView = window.SuperTabOutWindowView;
 let shortcutController = null;
+let automaticDashboardCleanupEnabled = false;
+let automaticDashboardCleanupFailed = false;
 
 let workspaceService = null;
 let workspaceOperations = null;
@@ -676,6 +678,11 @@ const UI_COPY = {
     tabReuseOn: 'On',
     tabReuseUnsupported: 'This browser does not support opening toolbar messages automatically.',
     tabReuseSettingsError: 'Could not load or save this setting.',
+    dashboardAutoCleanupLabel: 'Automatically merge Xiaoyu pages',
+    dashboardAutoCleanupHelp: 'Off by default. From the next dashboard load, keep the newest Xiaoyu page and close other unpinned dashboard pages. Unsaved input will be lost; windows containing only an old dashboard may close. Web pages and pinned tabs are protected.',
+    dashboardAutoCleanupOn: 'On · applies from the next dashboard load',
+    dashboardAutoCleanupSettingsError: 'Could not load or save this setting. Reopen Settings to retry.',
+    dashboardAutoCleanupError: 'Could not finish merging Xiaoyu pages. Remaining pages were kept; turn this setting off to clean up manually.',
     keywordSearchPlaceholder: 'Search groups or page names…',
     keywordSearchLabel: 'Search saved groups and page names',
     keywordManage: 'Manage',
@@ -947,6 +954,11 @@ const UI_COPY = {
     tabReuseOn: '已开启',
     tabReuseUnsupported: '当前浏览器不支持自动打开工具栏提示。',
     tabReuseSettingsError: '无法读取或保存设置。',
+    dashboardAutoCleanupLabel: '自动合并 Xiaoyu 页面',
+    dashboardAutoCleanupHelp: '默认关闭。从下次打开仪表盘起，保留最新 Xiaoyu 页，关闭其他未置顶的仪表盘。旧页未保存输入会丢失；只含旧页的窗口也会关闭。普通网页和置顶页不受影响。',
+    dashboardAutoCleanupOn: '已开启 · 下次打开仪表盘起生效',
+    dashboardAutoCleanupSettingsError: '无法读取或保存设置，请重新打开设置重试。',
+    dashboardAutoCleanupError: '自动合并未完成，未关闭的页面已保留；可关闭此设置后手动清理。',
     keywordSearchPlaceholder: '搜索分组或页面名称…',
     keywordSearchLabel: '搜索已保存的分组或页面名称',
     keywordManage: '管理',
@@ -2287,18 +2299,17 @@ function getRealTabs() {
   });
 }
 
-/**
- * checkTabOutDupes()
- *
- * Counts how many Tab Out pages are open. If more than 1,
- * shows a banner offering to close the extras.
- */
+/** 自动合并关闭时维持原提示，自动失败后保留手动处理路径。 */
 function checkTabOutDupes() {
   const tabOutTabs = openTabs.filter(t => t.isTabOut);
   const banner  = document.getElementById('tabOutDupeBanner');
   const textEl  = document.getElementById('tabOutDupeText');
   const countEl = document.getElementById('tabOutDupeCount');
   if (!banner) return;
+  if (automaticDashboardCleanupEnabled && !automaticDashboardCleanupFailed) {
+    banner.style.display = 'none';
+    return;
+  }
 
   if (tabOutTabs.length > 1) {
     if (textEl) {
@@ -5239,6 +5250,11 @@ document.addEventListener('keydown', async (e) => {
    ---------------------------------------------------------------- */
 initSettingsPanelLayout();
 window.XiaoyuTabReuseSettings?.init({ translate: tr, selectView: setSettingsView });
+window.XiaoyuDashboardCleanupSettings?.init({ translate: tr, onEnabledChange: enabled => {
+  if (automaticDashboardCleanupEnabled !== enabled) automaticDashboardCleanupFailed = false;
+  automaticDashboardCleanupEnabled = enabled;
+  checkTabOutDupes();
+} });
 shortcutController = window.XiaoyuKeywordSearch?.init({ translate: tr, notify: showToast });
 document.addEventListener('xiaoyu-shortcuts-changed', () => {
   if (activeOrganizationView === 'shortcuts') scheduleRefresh();
@@ -5250,7 +5266,25 @@ loadExtensionVersion();
 initStorageErrorToasts();
 cleanExpiredFavicons();
 
+/** 每次文档加载只报告一次就绪，不因仪表盘自动刷新重复清理。 */
+async function initializeDashboardCleanup() {
+  try {
+    const result = await chrome.runtime.sendMessage({ type: 'xiaoyu-dashboard-ready' });
+    if (result?.ok === false) {
+      automaticDashboardCleanupFailed = true;
+      if (automaticDashboardCleanupEnabled) showToast(tr('dashboardAutoCleanupError'));
+      console.warn('[Xiaoyu dashboard cleanup] Dashboard registration or cleanup failed');
+    }
+  } catch {
+    automaticDashboardCleanupFailed = true;
+    if (automaticDashboardCleanupEnabled) showToast(tr('dashboardAutoCleanupError'));
+    console.warn('[Xiaoyu dashboard cleanup] Background unavailable');
+  }
+}
+
+/** 初始化页面与本地数据，自动合并交由后台统一处理。 */
 async function initApp() {
+  await initializeDashboardCleanup();
   try {
     await StorageService?.migrateStorage?.();
   } catch (err) {

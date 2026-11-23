@@ -11,6 +11,7 @@ importScripts(
   'services/storage-service.js',
   'services/tabs-service.js',
   'services/tab-reuse.js',
+  'services/dashboard-cleanup.js',
   'services/search-service.js',
   'services/tools-service.js'
 );
@@ -235,6 +236,15 @@ chrome.runtime.onStartup.addListener(tabReuse.reset);
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && self.XiaoyuTabReuse.ENABLED_KEY in changes) tabReuse.reset();
 });
+// 所有仪表盘共用同一后台队列，避免每个页面各自删除造成互相关闭。
+const dashboardCleanup = self.XiaoyuDashboardCleanup.createController(chrome);
+chrome.tabs.onCreated.addListener(dashboardCleanup.onCreated);
+chrome.tabs.onUpdated.addListener(dashboardCleanup.onUpdated);
+chrome.tabs.onRemoved.addListener(dashboardCleanup.onRemoved);
+chrome.tabs.onReplaced.addListener((_addedId, removedId) => dashboardCleanup.onRemoved(removedId));
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && self.XiaoyuDashboardCleanup.ENABLED_KEY in changes) dashboardCleanup.cancel();
+});
 chrome.commands.onCommand.addListener(async (command) => {
   if (command === 'open-side-panel') {
     await openSidePanel();
@@ -267,7 +277,9 @@ chrome.omnibox.onInputEntered.addListener((text) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
-    if (message?.type === 'open-side-panel') {
+    if (message?.type === 'xiaoyu-dashboard-ready') {
+      sendResponse(await dashboardCleanup.onReady(sender));
+    } else if (message?.type === 'open-side-panel') {
       await openSidePanel(sender.tab);
       sendResponse({ ok: true });
     } else if (message?.type === 'save-current-session') {

@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { testKeywordSearch } from '../tests/keyword-search-browser.mjs';
 import { testShortcutLibraryBrowser } from '../tests/shortcut-library-browser.mjs';
+import { testDashboardCleanupBrowser } from '../tests/dashboard-cleanup-browser.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const extensionDir = process.env.EXTENSION_DIR ? resolve(process.env.EXTENSION_DIR) : join(root, 'extension');
@@ -66,11 +67,12 @@ class CdpPage {
 
   /** 执行测试断言并保留浏览器异常详情，避免重载失败只显示 Uncaught。 */
   async evaluate(expression) {
-    const result = await this.send('Runtime.evaluate', {
-      expression,
-      awaitPromise: true,
-      returnByValue: true,
-    });
+    let result;
+    try {
+      result = await this.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+    } catch (error) {
+      throw new Error(`${error.message}; test expression: ${expression.slice(0, 160)}`);
+    }
     if (result.exceptionDetails) {
       throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text || 'Runtime evaluation failed');
     }
@@ -498,6 +500,7 @@ async function main() {
     await page.evaluate(`document.querySelector('#toolInput').value = 'https://example.com'; document.querySelector('[data-tool-action="generate"]').click()`);
     await page.waitFor('document.querySelector(".qr-frame svg") && document.querySelector("#toolOutput").value.startsWith("<svg")');
 
+    await testDashboardCleanupBrowser(page, extensionBase);
     assert.deepEqual(page.errors, []);
     console.log('Chrome tools regression passed.');
   } finally {

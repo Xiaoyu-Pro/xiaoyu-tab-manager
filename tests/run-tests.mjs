@@ -9,6 +9,7 @@ import { testBrandContract } from './brand-contract.mjs';
 import { testPackageContract } from './package-contract.mjs';
 import { testKeywordMappings } from './keyword-mappings.test.mjs';
 import { testShortcutLibrary } from './shortcut-library.test.mjs';
+import { testDashboardCleanup } from './dashboard-cleanup.test.mjs';
 
 const require = createRequire(import.meta.url);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -1159,6 +1160,7 @@ testDragController();
 await testStorageService();
 await testKeywordMappings();
 await testShortcutLibrary();
+await testDashboardCleanup();
 testSearchService();
 testMetricsService();
 testHtmlService();

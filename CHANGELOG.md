@@ -8,6 +8,7 @@ All notable changes to Xiaoyu Tab Manager are tracked here. Entries before the r
 
 ### Added
 
+- Added an opt-in dashboard auto-merge setting. A background coordinator keeps the newest-created dashboard, protects ordinary pages / incognito / pinned tabs, and restores the original duplicate prompt when off, without changing Blue or webpage URL reuse.
 - Added grouped Shortcuts cards, shared exact-URL reuse and open-window status, right-click new copies, and Shift+Enter copies in search.
 - Added real-tab capture, cross-group aliases, and local JSON backup export / preview-and-merge import, preserving legacy mappings and local names/URLs without new permissions or Blue changes.
 - Added independent dashboard keyword search with local one-keyword-to-many-page mappings, keyboard selection, and a mapping manager, without changing the open-tab filter or requesting additional permissions.
