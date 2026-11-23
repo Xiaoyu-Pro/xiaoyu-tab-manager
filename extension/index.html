@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<!-- Modified by Xiaoyu-Pro for Xiaoyu Tab Manager; derived from Super Tab Out (Apache-2.0). -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xiaoyu Tab Manager</title>
+
+  <!-- Fonts: system stacks only — no network call. See style.css for the
+       --font-sans and --font-serif variables. -->
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="keyword-search.css">
+
+  <!-- Apply saved theme before body paints (avoids flash of default palette) -->
+  <script src="theme-init.js"></script>
+</head>
+<body>
+<div class="container">
+
+
+
+  <!-- ================================================================
+       HEADER — greeting on the left
+       ================================================================ -->
+  <header>
+    <div class="header-left">
+      <div class="brand-cluster">
+        <div class="brand-copy">
+          <!-- "Good afternoon" — written by getGreeting() in app.js -->
+          <h1 id="greeting"></h1>
+          <!-- "Friday, April 4, 2026" — written by getDateDisplay() in app.js -->
+          <div class="date" id="dateDisplay"></div>
+        </div>
+      </div>
+    </div>
+    <div class="keyword-search" id="keywordSearch">
+      <div class="keyword-search-field">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path stroke-linecap="round" d="m16 16 4 4"/></svg>
+        <input id="keywordSearchInput" type="text" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="keywordSearchList" autocomplete="off" spellcheck="false" data-i18n-placeholder="keywordSearchPlaceholder" data-i18n-aria-label="keywordSearchLabel" placeholder="Search groups or page names…" aria-label="Search saved groups and page names">
+        <button type="button" id="keywordManageBtn" class="keyword-manage-btn" data-i18n="keywordManage" data-i18n-title="keywordManageTitle" aria-haspopup="dialog">Manage</button>
+      </div>
+      <div class="keyword-search-results" id="keywordSearchResults" hidden>
+        <p id="keywordSearchHint" class="keyword-search-hint" role="status"></p>
+        <div id="keywordSearchList" role="listbox" data-i18n-aria-label="keywordResultsLabel" aria-label="Mapped pages"></div>
+      </div>
+    </div>
+    <div class="header-right">
+      <!-- Privacy mode toggle — lock icon. Esc is the keyboard shortcut. -->
+      <button class="privacy-toggle" id="privacyToggle" title="Toggle privacy mode (Esc)" aria-label="Toggle privacy mode">
+        <svg class="privacy-icon privacy-icon-off" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="20" height="20">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 1 1 9 0v3.75M3.75 21.75h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H3.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+        </svg>
+        <svg class="privacy-icon privacy-icon-on" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="20" height="20">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+        </svg>
+      </button>
+      <!-- Language picker — low-frequency setting kept as a compact current-language menu. -->
+      <div class="language-switcher" id="languageSwitcher" aria-label="Language">
+        <button class="language-current-btn" id="languageCurrentBtn" data-action="toggle-language-menu"
+                aria-haspopup="true" aria-expanded="false" title="Language">
+          <span class="language-current-label" id="activeLanguageLabel">EN</span>
+          <svg class="language-current-chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+        <div class="language-menu" id="languageMenu" role="radiogroup" aria-label="Language">
+          <button class="language-option" data-action="set-language" data-language="en" role="radio" aria-pressed="false" title="English">
+            <span class="language-option-label">English</span>
+            <span class="language-option-code">EN</span>
+          </button>
+          <button class="language-option" data-action="set-language" data-language="zh" role="radio" aria-pressed="false" title="中文">
+            <span class="language-option-label">中文</span>
+            <span class="language-option-code">中</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="appearance-group" aria-label="Appearance">
+        <!-- Theme picker — compact current theme button opens a larger palette grid. -->
+        <div class="theme-picker" id="themePicker">
+          <button class="theme-current-btn" id="themeCurrentBtn" data-action="toggle-theme-menu"
+                  aria-haspopup="true" aria-expanded="false" title="Theme">
+            <span class="theme-swatch theme-swatch-active theme-swatch-system" id="activeThemeSwatch"></span>
+            <span class="theme-current-label" id="activeThemeLabel">Adaptive Glow</span>
+            <svg class="theme-current-chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+          <div class="theme-menu" id="themeMenu" role="radiogroup" aria-label="Theme">
+            <button class="theme-option" data-action="set-theme" data-theme-name="system" role="radio" aria-pressed="false">
+              <span class="theme-swatch theme-swatch-system"></span><span class="theme-option-label">Adaptive Glow</span>
+            </button>
+            <button class="theme-option" data-action="set-theme" data-theme-name="white" role="radio" aria-pressed="false">
+              <span class="theme-swatch theme-swatch-white"></span><span class="theme-option-label">Ivory Page</span>
+            </button>
+            <button class="theme-option" data-action="set-theme" data-theme-name="material" role="radio" aria-pressed="false">
+              <span class="theme-swatch theme-swatch-material"></span><span class="theme-option-label">Material Orbit</span>
+            </button>
+            <button class="theme-option" data-action="set-theme" data-theme-name="cupertino" role="radio" aria-pressed="false">
+              <span class="theme-swatch theme-swatch-cupertino"></span><span class="theme-option-label">Cupertino Mist</span>
+            </button>
+            <button class="theme-option" data-action="set-theme" data-theme-name="warm" role="radio" aria-pressed="false">
+              <span class="theme-swatch theme-swatch-warm"></span><span class="theme-option-label">Warm Parchment</span>
+            </button>
+            <button class="theme-option" data-action="set-theme" data-theme-name="midnight" role="radio" aria-pressed="false">
+              <span class="theme-swatch theme-swatch-midnight"></span><span class="theme-option-label">Midnight Voyage</span>
+            </button>
+            <button class="theme-option" data-action="set-theme" data-theme-name="arctic" role="radio" aria-pressed="false">
+              <span class="theme-swatch theme-swatch-arctic"></span><span class="theme-option-label">Frost Field</span>
+            </button>
+            <button class="theme-option" data-action="set-theme" data-theme-name="forest" role="radio" aria-pressed="false">
+              <span class="theme-swatch theme-swatch-forest"></span><span class="theme-option-label">Forest Isle</span>
+            </button>
+            <button class="theme-option" data-action="set-theme" data-theme-name="graphite" role="radio" aria-pressed="false">
+              <span class="theme-swatch theme-swatch-graphite"></span><span class="theme-option-label">Graphite Gold</span>
+            </button>
+            <button class="theme-option" data-action="set-theme" data-theme-name="coast" role="radio" aria-pressed="false">
+              <span class="theme-swatch theme-swatch-coast"></span><span class="theme-option-label">Coral Tide</span>
+            </button>
+            <button class="theme-option" data-action="set-theme" data-theme-name="plum" role="radio" aria-pressed="false">
+              <span class="theme-swatch theme-swatch-plum"></span><span class="theme-option-label">Plum Shade</span>
+            </button>
+            <button class="theme-option" data-action="set-theme" data-theme-name="matcha" role="radio" aria-pressed="false">
+              <span class="theme-swatch theme-swatch-matcha"></span><span class="theme-option-label">Matcha Haze</span>
+            </button>
+            <button class="theme-option" data-action="set-theme" data-theme-name="ember" role="radio" aria-pressed="false">
+              <span class="theme-swatch theme-swatch-ember"></span><span class="theme-option-label">Ember Slate</span>
+            </button>
+            <button class="theme-option" data-action="set-theme" data-theme-name="lavender" role="radio" aria-pressed="false">
+              <span class="theme-swatch theme-swatch-lavender"></span><span class="theme-option-label">Lavender Breeze</span>
+            </button>
+          </div>
+        </div>
+        <!-- Font picker — system-font-only presets for readability and density. -->
+        <div class="font-picker" id="fontPicker">
+          <button class="font-current-btn" id="fontCurrentBtn" data-action="toggle-font-menu"
+                  aria-haspopup="true" aria-expanded="false" title="Typography">
+            <span class="font-current-mark" aria-hidden="true">Aa</span>
+            <span class="font-current-label" id="activeFontLabel">Type</span>
+            <svg class="font-current-chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+          <div class="font-menu" id="fontMenu" role="group" aria-label="Typography">
+            <button class="font-option" data-action="set-font-preset" data-font-preset="system" role="radio" aria-checked="false" aria-pressed="false">
+              <span class="font-sample" aria-hidden="true">Aa</span>
+              <span class="font-option-copy">
+                <span class="font-option-label">System</span>
+                <span class="font-option-desc">Native UI font</span>
+              </span>
+            </button>
+            <button class="font-option" data-action="set-font-preset" data-font-preset="readable" role="radio" aria-checked="false" aria-pressed="false">
+              <span class="font-sample font-sample-readable" aria-hidden="true">Aa</span>
+              <span class="font-option-copy">
+                <span class="font-option-label">Readable</span>
+                <span class="font-option-desc">Larger, looser rows</span>
+              </span>
+            </button>
+            <button class="font-option" data-action="set-font-preset" data-font-preset="compact" role="radio" aria-checked="false" aria-pressed="false">
+              <span class="font-sample font-sample-compact" aria-hidden="true">Aa</span>
+              <span class="font-option-copy">
+                <span class="font-option-label">Compact</span>
+                <span class="font-option-desc">More tabs per screen</span>
+              </span>
+            </button>
+            <button class="font-option" data-action="set-font-preset" data-font-preset="editorial" role="radio" aria-checked="false" aria-pressed="false">
+              <span class="font-sample font-sample-editorial" aria-hidden="true">Aa</span>
+              <span class="font-option-copy">
+                <span class="font-option-label">Editorial</span>
+                <span class="font-option-desc">Serif-led headings</span>
+              </span>
+            </button>
+            <div class="font-size-controls" role="group" aria-label="Size by area">
+              <div class="font-size-title" data-font-copy="fontSizeByArea">Size by area</div>
+              <div class="font-size-row">
+                <span class="font-size-area" data-font-copy="fontSizeHeader">Header</span>
+                <div class="font-size-segment" role="group" aria-label="Header size">
+                  <button class="font-size-option" data-action="set-font-size" data-font-size-area="header" data-font-size-value="small" aria-pressed="false" title="Small">S</button>
+                  <button class="font-size-option" data-action="set-font-size" data-font-size-area="header" data-font-size-value="default" aria-pressed="true" title="Default">M</button>
+                  <button class="font-size-option" data-action="set-font-size" data-font-size-area="header" data-font-size-value="large" aria-pressed="false" title="Large">L</button>
+                </div>
+              </div>
+              <div class="font-size-row">
+                <span class="font-size-area" data-font-copy="fontSizeCards">Cards</span>
+                <div class="font-size-segment" role="group" aria-label="Card title size">
+                  <button class="font-size-option" data-action="set-font-size" data-font-size-area="cards" data-font-size-value="small" aria-pressed="false" title="Small">S</button>
+                  <button class="font-size-option" data-action="set-font-size" data-font-size-area="cards" data-font-size-value="default" aria-pressed="true" title="Default">M</button>
+                  <button class="font-size-option" data-action="set-font-size" data-font-size-area="cards" data-font-size-value="large" aria-pressed="false" title="Large">L</button>
+                </div>
+              </div>
+              <div class="font-size-row">
+                <span class="font-size-area" data-font-copy="fontSizeTabs">Tab rows</span>
+                <div class="font-size-segment" role="group" aria-label="Tab row size">
+                  <button class="font-size-option" data-action="set-font-size" data-font-size-area="tabs" data-font-size-value="small" aria-pressed="false" title="Small">S</button>
+                  <button class="font-size-option" data-action="set-font-size" data-font-size-area="tabs" data-font-size-value="default" aria-pressed="true" title="Default">M</button>
+                  <button class="font-size-option" data-action="set-font-size" data-font-size-area="tabs" data-font-size-value="large" aria-pressed="false" title="Large">L</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="privacy-settings-btn" id="privacySettingsBtn" title="Settings" data-i18n-title="settingsTitle" aria-label="Settings" aria-haspopup="true" aria-expanded="false">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+        </svg>
+      </button>
+      <div class="privacy-settings" id="privacySettings" style="display:none">
+        <div class="privacy-settings-title" data-i18n="settingsTitle">Settings</div>
+        <div class="settings-tabs" role="tablist" aria-label="Settings sections" data-i18n-aria-label="settingsSectionsLabel">
+          <button class="settings-tab active" id="settingsTabAppearance" data-action="set-settings-view" data-settings-view="appearance" role="tab" aria-selected="true" aria-controls="settingsPaneAppearance" data-i18n="appearanceSettings">Appearance</button>
+          <button class="settings-tab" id="settingsTabTabs" data-action="set-settings-view" data-settings-view="tabs" role="tab" aria-selected="false" aria-controls="settingsPaneTabs" data-i18n="tabBehaviorSettings">Tabs</button>
+          <button class="settings-tab" id="settingsTabPrivacy" data-action="set-settings-view" data-settings-view="privacy" role="tab" aria-selected="false" aria-controls="settingsPanePrivacy" data-i18n="privacyScreenSettings">Privacy screen</button>
+        </div>
+
+        <div class="settings-pane active" id="settingsPaneAppearance" data-settings-pane="appearance" role="tabpanel" aria-labelledby="settingsTabAppearance">
+          <div class="settings-section">
+            <div class="settings-field">
+              <div class="settings-field-label" data-i18n="languageLabel">Language</div>
+              <div class="settings-field-control" id="settingsLanguageSlot"></div>
+            </div>
+            <div class="settings-field">
+              <div class="settings-field-label" data-i18n="themeLabel">Theme</div>
+              <div class="settings-field-control" id="settingsThemeSlot"></div>
+            </div>
+            <div class="settings-field">
+              <div class="settings-field-label" data-i18n="fontLabel">Typography</div>
+              <div class="settings-field-control" id="settingsFontSlot"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-pane" id="settingsPaneTabs" data-settings-pane="tabs" role="tabpanel" aria-labelledby="settingsTabTabs" hidden>
+          <label class="privacy-setting-row">
+            <span data-i18n="tabReuseLabel">Reuse identical tabs</span>
+            <span class="privacy-setting-switch">
+              <input type="checkbox" id="tabReuseEnabled" aria-describedby="tabReuseHelp tabReuseStatus" disabled>
+              <span class="privacy-setting-switch-track" aria-hidden="true"></span>
+            </span>
+          </label>
+          <p class="tab-reuse-setting-note" id="tabReuseHelp" data-i18n="tabReuseHelp">If a new foreground tab matches a page already open, Xiaoyu switches to it, closes the duplicate, and shows a brief toolbar message.</p>
+          <p class="tab-reuse-setting-note" id="tabReuseStatus" role="status" data-i18n="tabReuseOff">Off</p>
+        </div>
+
+        <div class="settings-pane" id="settingsPanePrivacy" data-settings-pane="privacy" role="tabpanel" aria-labelledby="settingsTabPrivacy">
+          <div class="settings-section-title" data-i18n="privacyScreenSettings">Privacy screen</div>
+          <label class="privacy-setting-row">
+            <span data-i18n="clock">Clock</span>
+            <span class="privacy-setting-switch">
+              <input type="checkbox" id="psClock" checked>
+              <span class="privacy-setting-switch-track" aria-hidden="true"></span>
+            </span>
+          </label>
+          <label class="privacy-setting-row">
+            <span data-i18n="date">Date</span>
+            <span class="privacy-setting-switch">
+              <input type="checkbox" id="psDate" checked>
+              <span class="privacy-setting-switch-track" aria-hidden="true"></span>
+            </span>
+          </label>
+          <label class="privacy-setting-row">
+            <span data-i18n="customText">Custom text</span>
+            <span class="privacy-setting-switch">
+              <input type="checkbox" id="psMotto" checked>
+              <span class="privacy-setting-switch-track" aria-hidden="true"></span>
+            </span>
+          </label>
+          <label class="privacy-setting-row">
+            <span data-i18n="externalFavicons">Load site icons</span>
+            <span class="privacy-setting-switch">
+              <input type="checkbox" id="psFavicons" checked>
+              <span class="privacy-setting-switch-track" aria-hidden="true"></span>
+            </span>
+          </label>
+          <div class="privacy-setting-sub" id="psMottoEdit">
+            <input type="text" id="psMottoInput" class="privacy-setting-input" placeholder="Type your text here..." data-i18n-placeholder="mottoPlaceholder">
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <dialog class="keyword-dialog" id="keywordManager" aria-labelledby="keywordManagerTitle" aria-describedby="keywordManagerHelp">
+    <div class="keyword-dialog-heading">
+      <h2 id="keywordManagerTitle" data-i18n="keywordManageTitle">Keyword mappings</h2>
+      <button type="button" id="keywordManagerClose" class="keyword-close-btn" data-i18n-aria-label="keywordClose" aria-label="Close">×</button>
+    </div>
+    <p class="keyword-note" id="keywordManagerHelp" data-i18n="keywordManagerHelp">Use the same keyword for multiple pages. Your mappings stay on this device.</p>
+    <form id="keywordMappingForm" class="keyword-mapping-form">
+      <label><span data-i18n="keywordField">Keyword</span><input id="keywordMappingKeyword" name="keyword" list="keywordMappingKeywords" required autocomplete="off" data-i18n-placeholder="keywordFieldPlaceholder" placeholder="e.g. dashboards"></label>
+      <datalist id="keywordMappingKeywords"></datalist>
+      <label><span data-i18n="keywordTitleField">Page name</span><input id="keywordMappingTitle" name="title" required autocomplete="off" data-i18n-placeholder="keywordTitlePlaceholder" placeholder="e.g. Main dashboard"></label>
+      <label class="keyword-url-field"><span data-i18n="keywordUrlField">URL</span><input id="keywordMappingUrl" name="url" type="url" required autocomplete="off" placeholder="https://…"></label>
+      <label class="keyword-url-field"><span data-i18n="keywordAliasesField">Aliases · one per line</span><textarea id="keywordMappingAliases" name="aliases" rows="2" data-i18n-placeholder="keywordAliasesPlaceholder" placeholder="Optional alternative names"></textarea></label>
+      <div class="keyword-form-actions">
+        <button type="submit" id="keywordMappingSave" class="keyword-primary" data-i18n="keywordAdd">Add page</button>
+        <button type="button" id="keywordMappingCancel" data-i18n="keywordCancelEdit" hidden>Cancel edit</button>
+      </div>
+    </form>
+    <p id="keywordManagerStatus" class="keyword-note" role="status" aria-live="polite"></p>
+    <div class="keyword-backup-tools">
+      <button type="button" id="keywordExport" data-i18n="keywordExport">Export backup</button>
+      <button type="button" id="keywordImport" data-i18n="keywordImport">Import backup</button>
+      <input type="file" id="keywordImportFile" accept=".json,application/json" hidden>
+    </div>
+    <p class="keyword-note" data-i18n="keywordBackupPrivacy">Backups contain full URLs. Keep internal links private.</p>
+    <section id="keywordImportPreview" class="keyword-import-preview" aria-labelledby="keywordImportPreviewTitle" hidden>
+      <strong id="keywordImportPreviewTitle" data-i18n="keywordImportPreviewTitle">Review import</strong>
+      <p id="keywordImportSummary" class="keyword-note" role="status"></p>
+      <div class="keyword-form-actions">
+        <button type="button" id="keywordImportConfirm" class="keyword-primary" data-i18n="keywordImportConfirm">Merge mappings</button>
+        <button type="button" id="keywordImportCancel" data-i18n="keywordImportCancel">Cancel import</button>
+      </div>
+    </section>
+    <div id="keywordMappingList" class="keyword-mapping-list"></div>
+  </dialog>
+  <div id="shortcutContextMenu" class="shortcut-context-menu" role="menu" hidden>
+    <button type="button" role="menuitem" id="shortcutNewCopy" data-i18n="shortcutNewCopy">Open a new copy</button>
+  </div>
+
+  <!-- ================================================================
+       PRIVACY SCREEN — hides dashboard content during screen sharing.
+       Activated by clicking the lock icon or pressing Esc. app.js toggles
+       body.privacy-mode; style.css shows/hides this screen + dashboard.
+       ================================================================ -->
+  <div class="privacy-screen" id="privacyScreen">
+    <div class="privacy-time" id="privacyTime"></div>
+    <div class="privacy-date" id="privacyDate"></div>
+    <div class="privacy-motto" id="privacyMotto"></div>
+    <div class="privacy-hint" data-i18n-html="privacyHint">Press <kbd>Esc</kbd> to show your tabs</div>
+  </div>
+
+  <!-- ================================================================
+       DUPES BANNER — appears when you have extra Xiaoyu Tab Manager tabs open
+       Hidden by default; app.js shows it when dupeTabOutCount > 1
+       ================================================================ -->
+  <div class="tab-cleanup-banner" id="tabOutDupeBanner" style="display:none">
+    <div class="tab-cleanup-left">
+      <div class="tab-cleanup-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
+        </svg>
+      </div>
+      <div class="tab-cleanup-text" id="tabOutDupeText">
+        You have <strong id="tabOutDupeCount"></strong> Xiaoyu Tab Manager tabs open. Keep just this one?
+      </div>
+    </div>
+    <button class="tab-cleanup-btn" data-action="close-tabout-dupes" data-i18n="closeExtras">Close extras</button>
+  </div>
+
+  <!-- ================================================================
+       MAIN CONTENT AREA — two-column layout
+       Left: open tabs (domain/mission cards)
+       Right: saved for later checklist
+       The right column only renders when it has items (JS controls this)
+       ================================================================ -->
+  <div class="dashboard-columns" id="dashboardColumns">
+
+    <!-- LEFT COLUMN: Open tabs -->
+    <div class="active-section" id="openTabsSection" style="display:none">
+      <div class="section-header">
+        <h2 id="openTabsSectionTitle">Right now</h2>
+        <div class="section-line"></div>
+        <div class="open-tabs-search-wrap">
+          <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
+          <input type="text" class="open-tabs-search" id="openTabsSearch" placeholder="Filter tabs" autocomplete="off" spellcheck="false" data-i18n-placeholder="search" aria-label="Filter tabs">
+          <span class="open-tabs-search-hint">/</span>
+        </div>
+        <div class="section-count" id="openTabsSectionCount"></div>
+      </div>
+      <div id="organizationNavMount"></div>
+      <div class="missions" id="openTabsMissions"></div>
+    </div>
+
+    <!-- RIGHT COLUMN: local saved work -->
+    <aside class="dashboard-side" id="dashboardSide" style="display:none">
+      <div class="deferred-column" id="deferredColumn" style="display:none">
+        <div class="section-header">
+          <h2 data-i18n="savedForLater">Saved for later</h2>
+          <div class="section-line"></div>
+          <div class="section-count" id="deferredCount"></div>
+        </div>
+
+        <!-- Active checklist items — injected by renderDeferredList() in app.js -->
+        <div class="deferred-list" id="deferredList"></div>
+
+        <!-- Empty state — shown when no active deferred tabs -->
+        <div class="deferred-empty" id="deferredEmpty" style="display:none">
+          <span data-i18n="deferredEmpty">Nothing saved. Living in the moment.</span>
+        </div>
+
+        <!-- Archive section — collapsed by default -->
+        <div class="deferred-archive" id="deferredArchive" style="display:none">
+          <div class="archive-header">
+            <button class="archive-toggle" id="archiveToggle" aria-expanded="false">
+              <svg class="archive-chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+              <span data-i18n="archive">Archive</span>
+              <span class="archive-count" id="archiveCount"></span>
+            </button>
+            <button class="archive-clear" id="clearArchiveBtn" data-action="clear-archive" type="button" data-i18n="clearArchive" data-i18n-title="clearArchive">Clear</button>
+          </div>
+          <div class="archive-body" id="archiveBody" style="display:none">
+            <input type="text" class="archive-search" id="archiveSearch" placeholder="Filter archived tabs..." data-i18n-placeholder="archiveSearchPlaceholder">
+            <div class="archive-list" id="archiveList"></div>
+          </div>
+        </div>
+      </div>
+
+      <section class="saved-sessions-card" id="savedSessionsCard" style="display:none">
+        <div class="section-header saved-sessions-header">
+          <h2 data-i18n="savedSessionsTitle">Saved sessions</h2>
+          <div class="section-line"></div>
+          <div class="section-count" id="savedSessionsCount"></div>
+        </div>
+        <div class="saved-sessions-list" id="savedSessionsList"></div>
+        <div class="deferred-empty" id="savedSessionsEmpty" style="display:none">
+          <span data-i18n="savedSessionsEmpty">No saved sessions yet.</span>
+        </div>
+      </section>
+    </aside>
+
+  </div><!-- end .dashboard-columns -->
+
+  <!-- ================================================================
+       FOOTER — global stats + refresh control
+       ================================================================ -->
+  <footer>
+    <div class="footer-stats">
+      <div class="stat">
+        <div class="stat-num" id="statTabs">—</div>
+        <div class="stat-label" data-i18n="openTabsStat">Open tabs</div>
+      </div>
+      <div class="stat" hidden>
+        <div class="stat-num" id="statHealth">—</div>
+        <div class="stat-label" data-i18n="tabHealthStat">Tab health</div>
+      </div>
+      <div class="stat" hidden>
+        <div class="stat-num" id="statClosedWeek">—</div>
+        <div class="stat-label" data-i18n="closedWeekStat">Closed this week</div>
+      </div>
+      <div class="stat" hidden>
+        <div class="stat-num" id="statSavedWeek">—</div>
+        <div class="stat-label" data-i18n="savedWeekStat">Saved this week</div>
+      </div>
+    </div>
+    <div class="project-credit">
+      <div class="project-credit-primary">
+        <a href="https://github.com/Xiaoyu-Pro/xiaoyu-tab-manager" target="_top">Xiaoyu Tab Manager</a>
+        <span class="project-version" id="extensionVersion" hidden></span>
+      </div>
+      <div class="project-credit-attribution" data-i18n-html="creditAttribution">
+        Apache-2.0 &middot; Based on
+        <a href="https://github.com/SivanCola/super-tab-out" target="_top">Super Tab Out</a> (Apache-2.0)
+        and <a href="https://github.com/zarazhangrui/tab-out" target="_top">Tab Out</a> (MIT)
+      </div>
+    </div>
+  </footer>
+
+  <nav class="command-dock-rail" aria-label="Xiaoyu Tab Manager dock">
+    <button class="command-dock-btn primary" id="commandDockToolsBtn" data-command-dock-view="tools" title="Tools" aria-label="Tools" aria-controls="commandDrawer" aria-expanded="false" type="button">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m14.25 6.087 4.163-4.163a2.25 2.25 0 0 1 3.182 3.182L17.431 9.27M14.25 6.087l-8.943 8.943a2.25 2.25 0 0 0-.659 1.591v2.729h2.729a2.25 2.25 0 0 0 1.591-.659l8.943-8.943M14.25 6.087l3.181 3.182M4.5 19.5h15" />
+      </svg>
+    </button>
+    <div class="command-dock-favorites" id="commandDockFavorites" hidden></div>
+  </nav>
+
+</div><!-- end .container -->
+
+<aside class="command-drawer-overlay" id="commandDrawer" aria-hidden="false">
+  <div class="command-drawer-backdrop" id="commandDrawerBackdrop"></div>
+  <section class="command-drawer" role="dialog" aria-modal="false" aria-labelledby="commandDrawerTitle" aria-hidden="true" inert>
+    <div class="panel-header">
+      <div>
+        <div class="panel-brand">Xiaoyu Tab Manager</div>
+        <h2 id="commandDrawerTitle">Tools</h2>
+      </div>
+    </div>
+
+    <main class="command-drawer-main">
+      <section class="panel-view active" id="toolsView">
+        <div class="tool-search-row">
+          <input id="toolSearch" type="search" placeholder="Search tools" autocomplete="off" aria-label="Search tools">
+          <button id="openToolsPageBtn">Full page</button>
+        </div>
+        <div class="tool-context-card">
+          <div class="panel-section-title" data-tool-copy="currentTabTools">Current tab tools</div>
+          <div class="tool-actions">
+            <button data-action="open-tool-current" data-tool-id="url">URL</button>
+            <button data-action="open-tool-current" data-tool-id="qr">QR</button>
+            <button data-action="open-tool-current" data-tool-id="hash">Hash</button>
+          </div>
+        </div>
+        <section class="panel-section">
+          <div class="panel-section-title" data-tool-copy="allTools">All tools</div>
+          <div id="toolList" class="tool-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <div class="panel-toast" id="panelToast"></div>
+  </section>
+</aside>
+
+<!-- ================================================================
+     TOAST — floats above everything, used for action confirmations
+     Hidden by default via CSS (opacity:0, translateY)
+     ================================================================ -->
+<div class="toast" id="toast">
+  <!-- Checkmark circle icon (Heroicons outline) -->
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+  </svg>
+  <span id="toastText"></span>
+</div>
+
+<!-- Personal config (gitignored) — defines LOCAL_LANDING_PAGE_PATTERNS etc. -->
+<!-- If the file doesn't exist it just 404s; app.js falls back to defaults. -->
+<!-- (Inline onerror attributes are blocked by the MV3 default CSP.) -->
+<script src="config.local.js"></script>
+
+<!-- Shared services — classic scripts keep the no-build MV3 setup intact. -->
+<script src="services/url-service.js"></script>
+<script src="services/html-service.js"></script>
+<script src="services/storage-service.js"></script>
+<script src="services/keyword-mappings.js"></script>
+<script src="services/shortcut-tabs.js"></script>
+<script src="services/tabs-service.js"></script>
+<script src="services/tab-reuse.js"></script>
+<script src="services/workspace-service.js"></script>
+<script src="services/workspace-planner.js"></script>
+<script src="services/workspace-operations.js"></script>
+<script src="services/drag-controller.js"></script>
+<script src="services/search-service.js"></script>
+<script src="services/metrics-service.js"></script>
+<script src="services/tools-service.js"></script>
+<script src="views/organization-nav.js"></script>
+<script src="views/workspace-view.js"></script>
+<script src="views/window-view.js"></script>
+<script src="views/shortcut-library-view.js"></script>
+<script src="views/tab-reuse-settings.js"></script>
+<script src="views/keyword-search.js"></script>
+<script src="sidepanel.js"></script>
+
+<!-- Main dashboard logic — loads last so the DOM is ready -->
+<script src="app.js"></script>
+</body>
+</html>

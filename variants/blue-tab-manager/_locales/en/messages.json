@@ -1,0 +1,26 @@
+{
+  "extensionName": {
+    "message": "Blue Tab Manager",
+    "description": "Extension name displayed in the browser and store listing."
+  },
+  "extensionDescription": {
+    "message": "A local-first new tab dashboard for organizing open tabs with tab filtering, privacy mode, themes, and tab groups.",
+    "description": "Short extension description displayed in the browser and store listing."
+  },
+  "commandOpenSidePanel": {
+    "message": "Open Blue Tab Manager side panel",
+    "description": "Keyboard shortcut description for opening the side panel."
+  },
+  "commandSaveCurrentSession": {
+    "message": "Save current Blue Tab Manager session",
+    "description": "Keyboard shortcut description for saving the current session."
+  },
+  "exactTabReuseComplete": {
+    "message": "Switched to the existing page and closed the duplicate tab.",
+    "description": "Notification shown after an exact-URL tab is reused."
+  },
+  "commandTogglePrivacyMode": {
+    "message": "Toggle Blue Tab Manager privacy mode",
+    "description": "Keyboard shortcut description for toggling privacy mode."
+  }
+}

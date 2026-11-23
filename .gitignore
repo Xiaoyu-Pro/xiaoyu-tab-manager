@@ -1,0 +1,28 @@
+node_modules/
+*.log
+*.db
+.DS_Store
+docs/superpowers/
+
+# Personal config (landing page patterns, etc.) — never push to GitHub
+extension/config.local.js
+.claude
+AGENTS.md
+.omx/
+
+# Local browser binary used for extension debugging only. Do not publish.
+tools/chrome-for-testing/
+
+# Local store upload packages. Generate with `npm run package`, but do not push to GitHub.
+dist/*.zip
+
+# 本地诊断、私有配置和凭证不进入公开仓库。
+extension/*.local.*
+variants/*/config.local.js
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx

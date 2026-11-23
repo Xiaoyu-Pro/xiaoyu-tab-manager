@@ -1,0 +1,26 @@
+{
+  "extensionName": {
+    "message": "Xiaoyu Tab Manager",
+    "description": "Extension name displayed in the browser and store listing."
+  },
+  "extensionDescription": {
+    "message": "A local-first new tab dashboard for organizing open tabs with tab filtering, privacy mode, themes, and tab groups.",
+    "description": "Short extension description displayed in the browser and store listing."
+  },
+  "commandOpenSidePanel": {
+    "message": "Open Xiaoyu Tab Manager side panel",
+    "description": "Keyboard shortcut description for opening the side panel."
+  },
+  "commandSaveCurrentSession": {
+    "message": "Save current Xiaoyu Tab Manager session",
+    "description": "Keyboard shortcut description for saving the current session."
+  },
+  "exactTabReuseComplete": {
+    "message": "That page was already open. Switched back to the original tab.",
+    "description": "Toolbar message shown after an exact-URL tab is reused."
+  },
+  "commandTogglePrivacyMode": {
+    "message": "Toggle Xiaoyu Tab Manager privacy mode",
+    "description": "Keyboard shortcut description for toggling privacy mode."
+  }
+}

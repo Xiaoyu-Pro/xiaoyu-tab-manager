@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Xiaoyu Tab Manager</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --surface: #edf8f0;
+      --ink: #24372a;
+      --accent: #2c724b;
+      --accent-surface: #d9efdf;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --surface: #1b2e24;
+        --ink: #e7f5eb;
+        --accent: #9ad6ae;
+        --accent-surface: #294737;
+      }
+    }
+    body {
+      margin: 0;
+      background: var(--surface);
+      color: var(--ink);
+      font: 14px/1.45 Georgia, "PingFang SC", serif;
+    }
+    .feedback {
+      box-sizing: border-box;
+      width: 264px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 15px;
+    }
+    svg {
+      flex: none;
+      padding: 4px;
+      border-radius: 50%;
+      background: var(--accent-surface);
+      color: var(--accent);
+    }
+    p { margin: 0; }
+  </style>
+  <script src="tab-reuse-popup.js" defer></script>
+</head>
+<body>
+  <div class="feedback" role="status">
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="m3.5 8 3 3 6-6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <p id="result">That page was already open. Switched back to the original tab.</p>
+  </div>
+</body>
+</html>

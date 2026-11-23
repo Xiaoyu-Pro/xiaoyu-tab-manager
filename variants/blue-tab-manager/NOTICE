@@ -1,0 +1,59 @@
+Blue Tab Manager
+Personalized copy of Xiaoyu Tab Manager, created on 2026-10-26.
+Changes: current product name and export prefix changed to Blue Tab Manager;
+greeting owner mark changed to 南瓜公主🎃; omnibox keyword changed to btm.
+The original copyright, attribution, and license notices follow unchanged.
+
+Xiaoyu Tab Manager
+Modifications Copyright (c) 2026 Xiaoyu-Pro
+https://github.com/Xiaoyu-Pro/super-tab-out
+
+Xiaoyu Tab Manager includes modifications to Super Tab Out. The modifications
+are distributed under the Apache License, Version 2.0. See the LICENSE file for
+the full license text and MODIFICATIONS.md for a summary of changed areas.
+
+This product includes modified portions of Super Tab Out by Sivan:
+https://github.com/SivanCola/super-tab-out
+
+Super Tab Out
+Copyright (c) 2026 Sivan
+
+Super Tab Out is licensed under the Apache License, Version 2.0.
+Its copyright and attribution notices are preserved here as required by the
+Apache License.
+
+This product includes modified portions of Tab Out by Zara Zhang:
+https://github.com/zarazhangrui/tab-out
+
+Tab Out is licensed under the MIT License. The required upstream copyright
+and permission notice is preserved below.
+
+MIT License
+
+Copyright (c) 2026 Zara Zhang (original Tab Out -- https://github.com/zarazhangrui/tab-out)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+This product includes QR Code generator library by Project Nayuki:
+https://www.nayuki.io/page/qr-code-generator-library
+https://github.com/nayuki/QR-Code-generator
+
+QR Code generator library is licensed under the MIT License. The required
+upstream copyright and permission notice is preserved in
+extension/vendor/qrcodegen.js.
