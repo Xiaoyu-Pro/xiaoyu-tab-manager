@@ -5,8 +5,62 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const mappings = require('../extension/services/keyword-mappings.js');
 
-/** 回归分组与跨组页面名匹配、完整网址、增改删持久化及失败隔离。 */
+/** 校验两种颜色格式、稳定默认色、危险输入、持久化与失败隔离。 */
+async function testGroupColors() {
+  assert.equal(mappings.normalizeGroupColor('#ddebE3'), '#DDEBE3');
+  assert.equal(mappings.normalizeGroupColor('#abc'), '#AABBCC');
+  assert.equal(mappings.normalizeGroupColor(' RGB(221, 235, 227) '), '#DDEBE3');
+  for (const invalid of ['', 'red', '#ABCD', '#12345678', 'rgb(256,0,0)', 'rgb(-1,0,0)', 'rgb(0.5,0,0)', 'rgba(0,0,0,1)', '#fff; color:red', null]) {
+    assert.throws(() => mappings.normalizeGroupColor(invalid), /keywordInvalidGroupColor/);
+  }
+  const data = { [mappings.STORAGE_KEY]: [{ id: 'page', keyword: 'tce', title: 'project', url: 'https://example.test/' }] };
+  let failWrite = false;
+  const storage = {
+    /** 读取隔离快照，避免测试状态与调用方共享引用。 */
+    async get(key) { return structuredClone({ [key]: data[key] }); },
+    /** 仅成功写入后更新状态，允许注入配额失败。 */
+    async set(values) { if (failWrite) throw new Error('quota'); Object.assign(data, structuredClone(values)); },
+  };
+  const service = mappings.createService(storage);
+  const originalMappings = structuredClone(data[mappings.STORAGE_KEY]);
+  assert.deepEqual(await service.getGroupColors(), {});
+  assert.equal(mappings.getGroupColor(' TCE '), mappings.getGroupColor('tce'));
+  await service.setGroupColor(' TCE ', 'rgb(221,235,227)');
+  await service.setGroupColor('tcc', '#E2EAF7');
+  assert.deepEqual(await mappings.createService(storage).getGroupColors(), { tce: '#DDEBE3', tcc: '#E2EAF7' });
+  assert.equal(mappings.getGroupColor('tCe', await service.getGroupColors()), '#DDEBE3');
+  await service.setGroupColor('__proto__', '#123456');
+  assert.equal(mappings.getGroupColor('__proto__', await service.getGroupColors()), '#123456');
+  assert.equal(mappings.getGroupTextColor('#FFFFFF'), '#000000');
+  assert.equal(mappings.getGroupTextColor('#000000'), '#FFFFFF');
+  assert.equal(mappings.getGroupTextColor('#777777'), '#000000');
+  assert.equal(mappings.getGroupTextColor('#0000FF'), '#FFFFFF');
+  await Promise.all([service.setGroupColor('a', '#AABBCC'), service.setGroupColor('b', '#112233')]);
+  assert.equal((await service.getGroupColors()).a, '#AABBCC');
+  assert.equal((await service.getGroupColors()).b, '#112233');
+  const before = structuredClone(data);
+  failWrite = true;
+  await assert.rejects(service.setGroupColor('tce', '#123456'), /quota/);
+  assert.deepEqual(data, before);
+  failWrite = false;
+  await service.setGroupColor('tce', null);
+  assert.equal(Object.hasOwn(await service.getGroupColors(), 'tce'), false);
+  assert.equal((await service.getGroupColors()).tcc, '#E2EAF7');
+  assert.deepEqual(data[mappings.STORAGE_KEY], originalMappings);
+  assert.equal('groupColors' in JSON.parse(await service.exportBackup()), false);
+  data[mappings.GROUP_COLORS_KEY] = { tce: 'url(https://bad.test/)' };
+  await assert.rejects(service.getGroupColors(), /keywordGroupColorLoadError/);
+  await assert.rejects(service.setGroupColor('tcc', '#123456'), /keywordGroupColorLoadError/);
+  assert.deepEqual(data[mappings.STORAGE_KEY], originalMappings);
+  for (const damaged of [null, [], { TCE: '#DDEBE3' }]) {
+    data[mappings.GROUP_COLORS_KEY] = damaged;
+    await assert.rejects(service.getGroupColors(), /keywordGroupColorLoadError/);
+  }
+}
+
+/** 回归分组配色、跨组匹配、完整网址、增改删持久化及失败隔离。 */
 export async function testKeywordMappings() {
+  await testGroupColors();
   const data = {};
   let failWrite = false;
   let nextId = 0;

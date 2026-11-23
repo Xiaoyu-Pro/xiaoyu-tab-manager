@@ -21,6 +21,10 @@
     const newCopyButton = document.getElementById('shortcutNewCopy');
     const importFile = document.getElementById('keywordImportFile');
     const importPreview = document.getElementById('keywordImportPreview');
+    const colorForm = document.getElementById('keywordGroupColorForm');
+    const colorCode = document.getElementById('keywordGroupColorCode');
+    const colorPicker = document.getElementById('keywordGroupColorPicker');
+    const colorPreview = document.getElementById('keywordGroupColorPreview');
     if (!root || !global.XiaoyuKeywordMappings || !global.SuperTabOutStorage) return;
     const api = global.XiaoyuKeywordMappings;
     const service = api.createService();
@@ -32,6 +36,8 @@
     let importSummary = null;
     let statusTimer = null;
     let rows = [];
+    let groupColors = {};
+    let colorLoadError = false;
     let matches = [];
     let selected = 0;
     let editingId = '';
@@ -89,6 +95,9 @@
         button.title = row.url;
         const groupTag = element('span', 'keyword-result-tag', row.keyword);
         groupTag.title = row.keyword;
+        const color = api.getGroupColor(row.keyword, groupColors);
+        groupTag.style.backgroundColor = color;
+        groupTag.style.color = api.getGroupTextColor(color);
         const state = global.XiaoyuShortcutLibrary.getStatus(tabSnapshot, row.url, translate);
         const meta = element('span', 'keyword-result-meta');
         meta.append(element('span', `shortcut-open-state${state.opened ? ' is-open' : ''}`, state.text), groupTag);
@@ -160,10 +169,11 @@
       statusTimer = setTimeout(refreshTabStatus, 150);
     }
 
-    /** 提供无副作用的数据快照，供快捷主视图读取同一份映射。 */
+    /** 独立读取映射、配色和标签状态，坏配色不能清空正常映射。 */
     async function getSnapshot() {
-      const [saved, tabs] = await Promise.allSettled([service.list(), tabService.getSnapshot()]);
+      const [saved, tabs, colors] = await Promise.allSettled([service.list(), tabService.getSnapshot(), service.getGroupColors()]);
       return { rows: saved.status === 'fulfilled' ? saved.value : [], loadError: saved.status !== 'fulfilled',
+        groupColors: colors.status === 'fulfilled' ? colors.value : {}, colorLoadError: colors.status !== 'fulfilled',
         tabSnapshot: tabs.status === 'fulfilled' ? tabs.value : null };
     }
 
@@ -172,6 +182,7 @@
       if (document.body.classList.contains('privacy-mode')) return;
       closeMenu();
       closeResults();
+      colorForm.hidden = true;
       showStatus();
       deletingId = '';
       if (draft) {
@@ -218,7 +229,7 @@
 
     /** 使用有限的已知验证错误文案，其余存储异常统一提示重试。 */
     function showError(error) {
-      const keys = ['keywordRequired', 'keywordTitleRequired', 'keywordInvalidUrl', 'keywordInvalidAliases', 'keywordDuplicate', 'keywordMissing', 'keywordDataError', 'keywordBackupInvalid', 'keywordBackupTooLarge'];
+      const keys = ['keywordRequired', 'keywordTitleRequired', 'keywordInvalidUrl', 'keywordInvalidAliases', 'keywordDuplicate', 'keywordMissing', 'keywordDataError', 'keywordBackupInvalid', 'keywordBackupTooLarge', 'keywordInvalidGroupColor', 'keywordGroupColorLoadError'];
       showStatus(keys.includes(error?.message) ? error.message : 'keywordSaveError', true);
     }
 
@@ -232,7 +243,47 @@
       cancelButton.hidden = true;
     }
 
-    /** 按关键词渲染可折叠卡片，保留本页展开状态和二次删除确认。 */
+    /** 只预览完整有效色码，输入中的半成品留待保存时明确校验。 */
+    function previewGroupColor() {
+      let color;
+      try { color = api.normalizeGroupColor(colorCode.value); } catch { return; }
+      colorPicker.value = color;
+      colorPreview.style.backgroundColor = color;
+      colorPreview.style.color = api.getGroupTextColor(color);
+    }
+
+    /** 打开分组级配色表单，不清空用户正在填写的页面映射。 */
+    function openGroupColor(keyword) {
+      if (busy || colorLoadError) return;
+      colorForm.dataset.keyword = keyword;
+      colorForm.hidden = false;
+      document.getElementById('keywordGroupColorTitle').textContent = `${translate('keywordGroupColor')} · ${keyword}`;
+      colorCode.value = api.getGroupColor(keyword, groupColors);
+      colorPreview.textContent = keyword;
+      colorPreview.title = keyword;
+      previewGroupColor();
+      showStatus();
+      colorCode.focus();
+    }
+
+    /** 保存成功才更新输入，失败保留 HEX/RGB 草稿；重置只影响本组。 */
+    async function saveGroupColor(event, reset = false) {
+      event.preventDefault();
+      if (busy || colorLoadError) return;
+      setBusy(true);
+      showStatus();
+      try {
+        const saved = await service.setGroupColor(colorForm.dataset.keyword, reset ? null : colorCode.value);
+        // 使用已确认写入的值，避免并发存储刷新尚未落到视图时读回旧颜色。
+        colorCode.value = api.getGroupColor(colorForm.dataset.keyword, saved);
+        previewGroupColor();
+        await refresh();
+        if (!colorLoadError) showStatus('keywordGroupColorSaved');
+      } catch (error) { showError(error); }
+      finally { setBusy(false); }
+    }
+
+    /** 按关键词渲染可折叠组及颜色按钮，保留展开状态和删除确认。 */
     function renderManager() {
       mappingList.querySelectorAll('details.keyword-mapping-group').forEach(group => {
         groupExpansion.set(group.dataset.keyword, group.open);
@@ -264,7 +315,15 @@
         const summary = element('summary', 'keyword-group-summary');
         const name = element('span', 'keyword-group-name', group[0].keyword);
         name.title = group[0].keyword;
-        summary.append(name, element('span', 'keyword-group-count', translate('keywordPageCount', { count: group.length })));
+        const colorButton = element('button', 'keyword-group-color-button');
+        colorButton.type = 'button';
+        colorButton.dataset.groupColor = group[0].keyword;
+        colorButton.title = translate('keywordGroupColorButton', { group: group[0].keyword });
+        colorButton.setAttribute('aria-label', colorButton.title);
+        colorButton.setAttribute('aria-controls', 'keywordGroupColorForm');
+        colorButton.disabled = busy || colorLoadError;
+        colorButton.style.backgroundColor = api.getGroupColor(group[0].keyword, groupColors);
+        summary.append(name, colorButton, element('span', 'keyword-group-count', translate('keywordPageCount', { count: group.length })));
         const list = element('ul');
         section.append(summary, list);
         group.forEach(row => {
@@ -305,6 +364,8 @@
         rows = snapshot.rows;
         tabSnapshot = snapshot.tabSnapshot;
         loadError = snapshot.loadError;
+        groupColors = snapshot.groupColors;
+        colorLoadError = snapshot.colorLoadError;
       } catch {
         if (id !== refreshId) return;
         rows = [];
@@ -313,12 +374,15 @@
       loaded = true;
       renderResults();
       renderManager();
+      setBusy(busy);
+      if (colorLoadError && dialog.open) showStatus('keywordGroupColorLoadError', true);
     }
 
     /** 管理页写入期间禁用修改入口，防止重复提交。 */
     function setBusy(value) {
       busy = value;
       [...form.elements, ...mappingList.querySelectorAll('button')].forEach(control => { control.disabled = value; });
+      [...colorForm.elements, ...mappingList.querySelectorAll('[data-group-color]')].forEach(control => { control.disabled = value || colorLoadError; });
       document.getElementById('keywordManagerClose').disabled = value;
       ['keywordExport', 'keywordImport', 'keywordImportConfirm', 'keywordImportCancel'].forEach(id => {
         document.getElementById(id).disabled = value;
@@ -347,6 +411,13 @@
 
     /** 编辑单条映射或在第二次点击后删除，其他组不受影响。 */
     async function handleRowAction(event) {
+      const colorButton = event.target.closest('[data-group-color]');
+      if (colorButton) {
+        event.preventDefault();
+        event.stopPropagation();
+        openGroupColor(colorButton.dataset.groupColor);
+        return;
+      }
       const button = event.target.closest('[data-mapping-action]');
       if (!button || busy) return;
       const row = rows.find(item => item.id === button.dataset.mappingId);
@@ -523,7 +594,12 @@
       if (busy) event.preventDefault();
     });
     // 原生 dialog 已恢复入口焦点；close 事件中再次 focus 会抢走用户的新焦点。
-    dialog.addEventListener('close', () => { resetForm(); deletingId = ''; });
+    dialog.addEventListener('close', () => { resetForm(); deletingId = ''; colorForm.hidden = true; });
+    colorForm.addEventListener('submit', saveGroupColor);
+    colorCode.addEventListener('input', previewGroupColor);
+    colorPicker.addEventListener('input', () => { colorCode.value = colorPicker.value.toUpperCase(); previewGroupColor(); });
+    document.getElementById('keywordGroupColorReset').addEventListener('click', event => saveGroupColor(event, true));
+    document.getElementById('keywordGroupColorClose').addEventListener('click', () => { colorForm.hidden = true; });
     form.addEventListener('submit', submitMapping);
     cancelButton.addEventListener('click', () => { resetForm(); showStatus(); });
     mappingList.addEventListener('click', handleRowAction);
@@ -537,7 +613,7 @@
       renderImportPreview();
     });
     global.chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local' && api.STORAGE_KEY in changes) {
+      if (area === 'local' && (api.STORAGE_KEY in changes || api.GROUP_COLORS_KEY in changes)) {
         refresh();
         document.dispatchEvent(new Event('xiaoyu-shortcuts-changed'));
       }
@@ -552,6 +628,7 @@
     document.addEventListener('super-tab-out-language-change', () => {
       renderResults();
       renderManager();
+      if (!colorForm.hidden) document.getElementById('keywordGroupColorTitle').textContent = `${translate('keywordGroupColor')} · ${colorForm.dataset.keyword}`;
       showStatus(statusKey, statusError);
       renderImportPreview();
     });

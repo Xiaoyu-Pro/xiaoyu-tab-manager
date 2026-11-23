@@ -82,7 +82,18 @@
 .keyword-result-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .keyword-result-url { grid-column: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; }
 .keyword-result-meta { grid-column: 2; grid-row: 1 / 3; display: grid; gap: 4px; justify-items: end; min-width: 0; }
-.keyword-result-tag { max-width: 95px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 10px; }
+.keyword-result-tag, .keyword-color-preview { display: inline-block; max-width: 95px; box-sizing: border-box; padding: 3px 8px; border: 1px solid rgba(0, 0, 0, .07); border-radius: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; font-weight: 500; line-height: 1.5; }
+.keyword-group-swatch { display: inline-block; width: 11px; height: 11px; margin-left: 8px; border: 1px solid var(--hairline); border-radius: 3px; vertical-align: middle; }
+.keyword-group-color-button { flex-shrink: 0; width: 22px; height: 22px; padding: 0; border: 1px solid var(--hairline); border-radius: 5px; cursor: pointer; }
+.keyword-color-form { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: end; gap: 10px; margin-top: 18px; padding: 14px; border: 1px solid var(--hairline); border-radius: 10px; background: var(--surface-soft); }
+.keyword-color-heading { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.keyword-color-heading strong { min-width: 0; overflow-wrap: anywhere; font-size: 12px; }
+.keyword-color-heading button { border: 0; padding: 0 4px; background: transparent; color: var(--muted); font-size: 20px; }
+.keyword-color-form label { display: grid; min-width: 0; gap: 5px; color: var(--muted); font-size: 10px; }
+.keyword-color-form input { min-width: 0; width: 100%; height: 36px; box-sizing: border-box; border: 1px solid var(--hairline); border-radius: 6px; background: var(--surface-raised); color: var(--ink); padding: 7px 8px; font: 12px var(--font-sans); }
+.keyword-color-form input[type="color"] { padding: 3px; cursor: pointer; }
+.keyword-color-form .keyword-note, .keyword-color-form .keyword-form-actions { grid-column: 1 / -1; margin: 0; }
+.keyword-color-form input:focus-visible { outline: 2px solid var(--accent-sage); outline-offset: 2px; }
 .keyword-dialog {
   width: min(620px, calc(100vw - 32px));
   max-height: calc(100vh - 48px);

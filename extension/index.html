@@ -307,6 +307,14 @@
         <button type="button" id="keywordMappingCancel" data-i18n="keywordCancelEdit" hidden>Cancel edit</button>
       </div>
     </form>
+    <form id="keywordGroupColorForm" class="keyword-color-form" aria-labelledby="keywordGroupColorTitle" hidden>
+      <div class="keyword-color-heading"><strong id="keywordGroupColorTitle"></strong><button type="button" id="keywordGroupColorClose" data-i18n-aria-label="keywordClose" aria-label="Close">×</button></div>
+      <label><span data-i18n="keywordGroupColor">Group color</span><input type="color" id="keywordGroupColorPicker" value="#DDEBE3"></label>
+      <label><span>HEX / RGB</span><input id="keywordGroupColorCode" required autocomplete="off" spellcheck="false" maxlength="64" aria-describedby="keywordGroupColorHelp" placeholder="#DDEBE3 / rgb(221,235,227)"></label>
+      <span id="keywordGroupColorPreview" class="keyword-color-preview"></span>
+      <p id="keywordGroupColorHelp" class="keyword-note" data-i18n="keywordGroupColorHelp">Use #RGB, #RRGGBB or rgb(r, g, b), with channels from 0 to 255.</p>
+      <div class="keyword-form-actions"><button type="submit" class="keyword-primary" id="keywordGroupColorSave" data-i18n="keywordGroupColorSave">Save color</button><button type="button" id="keywordGroupColorReset" data-i18n="keywordGroupColorReset">Restore default</button></div>
+    </form>
     <p id="keywordManagerStatus" class="keyword-note" role="status" aria-live="polite"></p>
     <div class="keyword-backup-tools">
       <button type="button" id="keywordExport" data-i18n="keywordExport">Export backup</button>

@@ -156,6 +156,9 @@ function testLibraryRendering() {
   assert.doesNotMatch(html, /<img|<script>/);
   assert.match(html, /data-mapping-id="&quot;&lt;x&gt;"/);
   assert.match(html, /shortcutStatusUnknown/);
+  assert.match(html, /class="keyword-group-swatch"/);
+  assert.match(library.render({ rows: [{ id: 'color', keyword: 'tce', title: 'project', url: 'https://a.test/' }],
+    groupColors: { tce: '#123456' }, translate }), /background-color: #123456/);
   assert.match(library.render({ translate }), /keywordEmpty/);
   assert.match(library.render({ loadError: true, translate }), /keywordLoadError/);
 }

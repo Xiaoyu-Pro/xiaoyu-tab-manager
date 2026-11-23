@@ -121,6 +121,93 @@ async function testCrossGroupPageSearch(page, base) {
   await page.evaluate(`chrome.tabs.query({}).then(tabs => Promise.all(tabs.filter(tab => tab.url?.startsWith(${JSON.stringify(base)})).map(tab => chrome.tabs.remove(tab.id))))`);
 }
 
+/** 从管理入口保存分组颜色，检查按钮不会顺带改变折叠状态。 */
+async function setGroupColor(page, keyword, value) {
+  await page.evaluate(`(() => { if (!document.querySelector('#keywordManager').open) document.querySelector('#keywordManageBtn').click(); })()`);
+  const selector = `[data-group-color=${JSON.stringify(keyword)}]`;
+  await page.waitFor(`document.querySelector(${JSON.stringify(selector)}) && !document.querySelector(${JSON.stringify(selector)}).disabled`);
+  const wasOpen = await page.evaluate(`document.querySelector(${JSON.stringify(selector)}).closest('details').open`);
+  await page.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
+  assert.equal(await page.evaluate(`document.querySelector(${JSON.stringify(selector)}).closest('details').open`), wasOpen);
+  await page.evaluate(`(() => { const code = document.querySelector('#keywordGroupColorCode'); code.value = ${JSON.stringify(value)};
+    code.dispatchEvent(new Event('input')); document.querySelector('#keywordGroupColorForm').requestSubmit(); })()`);
+  await page.waitFor(`!document.querySelector('#keywordGroupColorSave').disabled && /updated|已更新/.test(document.querySelector('#keywordManagerStatus').textContent)`);
+}
+
+/** 验证两种格式、持久化、色标同步、失败保留、默认恢复及窄屏布局。 */
+async function testGroupColorSettings(page, extensionBase) {
+  const mappings = await page.evaluate(`chrome.storage.local.get('keywordPageMappings').then(data => data.keywordPageMappings)`);
+  try {
+    await setGroupColor(page, 'tce', 'rgb(221,235,227)');
+    assert.equal(await page.evaluate(`chrome.storage.local.get('keywordGroupColors').then(data => data.keywordGroupColors.tce)`), '#DDEBE3');
+    assert.equal(await page.evaluate(`document.querySelector('#keywordGroupColorPicker').value`), '#ddebe3');
+    await page.evaluate(`document.querySelector('#keywordGroupColorCode').value = 'rgb(256,0,0)'; document.querySelector('#keywordGroupColorForm').requestSubmit()`);
+    await page.waitFor(`document.querySelector('#keywordManagerStatus').textContent.includes('valid HEX')`);
+    assert.equal(await page.evaluate(`document.querySelector('#keywordGroupColorCode').value`), 'rgb(256,0,0)');
+    await page.evaluate(`window.groupColorOriginalSet = SuperTabOutStorage.set; SuperTabOutStorage.set = async values => {
+      if ('keywordGroupColors' in values) throw new Error('test quota'); return window.groupColorOriginalSet(values); };
+      document.querySelector('#keywordGroupColorCode').value = '#123456'; document.querySelector('#keywordGroupColorForm').requestSubmit()`);
+    await page.waitFor(`document.querySelector('#keywordManagerStatus').textContent.includes('Could not save') && !document.querySelector('#keywordGroupColorSave').disabled`);
+    assert.equal(await page.evaluate(`document.querySelector('#keywordGroupColorCode').value`), '#123456');
+    assert.equal(await page.evaluate(`chrome.storage.local.get('keywordGroupColors').then(data => data.keywordGroupColors.tce)`), '#DDEBE3');
+    await page.evaluate(`SuperTabOutStorage.set = window.groupColorOriginalSet; delete window.groupColorOriginalSet`);
+    await setGroupColor(page, 'tce', '#123456');
+    await page.evaluate(`document.querySelector('#keywordManagerClose').click()`);
+    await page.navigate(`${extensionBase}/index.html`);
+    await search(page, 'argall');
+    await page.waitFor(`Array.from(document.querySelectorAll('.keyword-result-tag')).some(tag => tag.textContent === 'tce' && tag.style.backgroundColor === 'rgb(18, 52, 86)')`);
+    assert.equal(await page.evaluate(`Array.from(document.querySelectorAll('.keyword-result-tag')).find(tag => tag.textContent === 'tce').style.color`), 'rgb(255, 255, 255)');
+    await page.evaluate(`document.querySelector('[data-organization-view="shortcuts"]').click()`);
+    await page.waitFor(`Array.from(document.querySelectorAll('.shortcut-library-card')).some(card => card.querySelector('.mission-name').textContent === 'tce' && card.querySelector('.keyword-group-swatch').style.backgroundColor === 'rgb(18, 52, 86)')`);
+    await setGroupColor(page, '看板', '#E2EAF7');
+    await page.evaluate(`document.querySelector('[data-group-color="tce"]').click(); document.querySelector('#keywordGroupColorReset').click()`);
+    await page.waitFor(`chrome.storage.local.get('keywordGroupColors').then(data => !Object.hasOwn(data.keywordGroupColors, 'tce'))`);
+    assert.equal(await page.evaluate(`chrome.storage.local.get('keywordGroupColors').then(data => data.keywordGroupColors['看板'])`), '#E2EAF7');
+    await page.waitFor(`!document.querySelector('#keywordGroupColorSave').disabled`);
+    await setGroupColor(page, 'tce', '#DDEBE3');
+    await page.evaluate(`document.querySelector('#keywordManagerClose').click(); chrome.storage.local.set({ keywordGroupColors: { tce: '#EEE5F5', '看板': '#E2EAF7' } })`);
+    await search(page, 'argall');
+    await page.waitFor(`Array.from(document.querySelectorAll('.keyword-result-tag')).some(tag => tag.textContent === 'tce' && tag.style.backgroundColor === 'rgb(238, 229, 245)')`);
+    await page.evaluate(`chrome.storage.local.set({ keywordGroupColors: { tce: 'bad-css' } }); document.querySelector('#keywordManageBtn').click()`);
+    await page.waitFor(`document.querySelector('#keywordManagerStatus').textContent.includes('Could not read group colors')`);
+    assert.equal(await page.evaluate(`document.querySelector('[data-group-color="tce"]').disabled`), true);
+    assert.equal(await page.evaluate(`document.querySelectorAll('.keyword-mapping-row').length`), mappings.length);
+    await page.evaluate(`document.querySelector('#keywordManagerClose').click()`);
+    await search(page, 'argall');
+    assert.equal(await page.evaluate(`document.querySelectorAll('.keyword-search-option').length`), 2);
+    await page.evaluate(`chrome.storage.local.set({ keywordGroupColors: { tce: '#DDEBE3', '看板': '#E2EAF7' } })`);
+    await setGroupColor(page, 'tce', '#DDEBE3');
+    await screenshot(page, 'group-colors-editor.png');
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 900, deviceScaleFactor: 1, mobile: false });
+    assert.equal(await page.evaluate(`document.querySelector('#keywordManager').scrollWidth > document.querySelector('#keywordManager').clientWidth`), false);
+    await screenshot(page, 'group-colors-editor-mobile.png');
+    await page.send('Emulation.clearDeviceMetricsOverride');
+    await page.evaluate(`document.querySelector('#keywordManagerClose').click()`);
+    await page.waitFor(`Array.from(document.querySelectorAll('.shortcut-library-card')).some(card => card.querySelector('.mission-name').textContent === 'tce' && card.querySelector('.keyword-group-swatch').style.backgroundColor === 'rgb(221, 235, 227)')`);
+    for (const theme of ['white', 'midnight']) {
+      await page.evaluate(`document.querySelector('[data-theme-name="${theme}"]').click()`);
+      await search(page, 'argall');
+      assert.equal(await page.evaluate(`Array.from(document.querySelectorAll('.keyword-result-tag')).filter(tag => tag.style.backgroundColor && parseFloat(getComputedStyle(tag).borderRadius) >= 6).length`), 2);
+      await screenshot(page, `group-colors-search-${theme}.png`);
+      await page.evaluate(`document.querySelector('#keywordSearchInput').blur()`);
+      await page.waitFor(`document.querySelector('.shortcut-library-grid').getAnimations({ subtree: true }).every(animation => animation.playState !== 'running') && getComputedStyle(document.querySelector('.shortcut-library-card')).opacity === '1'`);
+      await screenshot(page, `group-colors-cards-${theme}.png`);
+    }
+    await page.evaluate(`document.querySelector('#keywordManageBtn').click()`);
+    await page.waitFor(`!document.querySelector('[data-group-color="tce"]').disabled`);
+    await page.evaluate(`document.querySelector('[data-group-color="tce"]').focus()`);
+    await press(page, 'Enter', 13);
+    assert.equal(await page.evaluate(`document.activeElement.id`), 'keywordGroupColorCode');
+    await page.evaluate(`document.body.classList.add('privacy-mode')`);
+    await page.waitFor(`!document.querySelector('#keywordManager').open && document.querySelector('#keywordGroupColorForm').hidden`);
+    await page.evaluate(`document.body.classList.remove('privacy-mode')`);
+    assert.deepEqual(await page.evaluate(`chrome.storage.local.get('keywordPageMappings').then(data => data.keywordPageMappings)`), mappings);
+  } finally {
+    await page.evaluate(`(() => { if (window.groupColorOriginalSet) { SuperTabOutStorage.set = window.groupColorOriginalSet; delete window.groupColorOriginalSet; } })()`);
+    await page.evaluate(`chrome.storage.local.remove('keywordGroupColors'); localStorage.removeItem('organizationView')`);
+  }
+}
+
 /** 验证映射 CRUD、长期保存、候选隔离、单页打开、输入法和响应式布局。 */
 export async function testKeywordSearch(page, extensionBase) {
   const server = createServer((_request, response) => {
@@ -239,13 +326,14 @@ export async function testKeywordSearch(page, extensionBase) {
     assert.equal(await page.evaluate(`getComputedStyle(document.querySelector('#keywordSearch')).display`), 'none');
     await page.evaluate(`document.body.classList.remove('privacy-mode'); document.querySelector('[data-language="en"]').click(); document.querySelector('[data-theme-name="system"]').click()`);
     await testCrossGroupPageSearch(page, base);
+    await testGroupColorSettings(page, extensionBase);
     await page.evaluate(`chrome.storage.local.remove('keywordPageMappings')`);
     // 本脚本使用全新隔离配置；清除测试切换的偏好，供后续默认主题回归使用。
     await page.evaluate(`localStorage.removeItem('tab-out-theme'); localStorage.removeItem('tab-out-language')`);
     await page.navigate(`${extensionBase}/index.html`);
     await page.waitFor('document.querySelector("#keywordSearchInput")');
     assert.deepEqual(page.errors, []);
-    console.log('Keyword search browser regression passed (CRUD, persistence, keyboard, privacy, themes, 4 viewports).');
+    console.log('Keyword search browser regression passed (CRUD, group colors, HEX/RGB, persistence, failures, swatch sync, keyboard, privacy, themes, 4 viewports).');
   } finally {
     await new Promise(resolve => server.close(resolve));
   }

@@ -3,6 +3,7 @@
   'use strict';
   const html = global.SuperTabOutHtml || (typeof require === 'function' ? require('../services/html-service.js') : null);
   const tabs = global.XiaoyuShortcutTabs || (typeof require === 'function' ? require('../services/shortcut-tabs.js') : null);
+  const mappings = global.XiaoyuKeywordMappings || (typeof require === 'function' ? require('../services/keyword-mappings.js') : null);
 
   /** 用相同快照生成搜索和卡片状态，查询失败不谎报页面尚未打开。 */
   function getStatus(snapshot, url, translate) {
@@ -13,8 +14,8 @@
     }) } : { opened: false, text: translate('shortcutNotOpened') };
   }
 
-  /** 生成与现有组织视图一致的分组卡片，所有用户数据必须转义。 */
-  function render({ rows = [], tabSnapshot = null, loadError = false, translate }) {
+  /** 保留分组链接列表，仅在组名后展示同源配色的小方块，名称全部转义。 */
+  function render({ rows = [], tabSnapshot = null, loadError = false, groupColors = {}, translate }) {
     const escape = html.escapeHtml;
     const toolbar = `<div class="shortcut-library-toolbar"><p>${escape(translate('shortcutLibraryHelp'))}</p>
       <button type="button" class="action-btn" data-action="manage-shortcuts">${escape(translate('keywordManage'))}</button></div>`;
@@ -28,7 +29,7 @@
     return toolbar + `<div class="shortcut-library-grid">${[...groups.values()].map(group => `
       <section class="mission-card organization-card shortcut-library-card">
         <div class="mission-content">
-          <div class="organization-card-header"><span class="mission-name">${escape(group[0].keyword)}</span>
+          <div class="organization-card-header"><span class="mission-name">${escape(group[0].keyword)}<span class="keyword-group-swatch" style="background-color: ${mappings.getGroupColor(group[0].keyword, groupColors)}" aria-hidden="true"></span></span>
             <span class="open-tabs-badge">${escape(translate('keywordPageCount', { count: group.length }))}</span></div>
           <div class="mission-pages">${group.map(row => {
             const state = getStatus(tabSnapshot, row.url, translate);

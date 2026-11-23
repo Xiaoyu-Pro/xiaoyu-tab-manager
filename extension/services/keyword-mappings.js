@@ -2,6 +2,8 @@
 (function (global) {
   'use strict';
   const STORAGE_KEY = 'keywordPageMappings';
+  const GROUP_COLORS_KEY = 'keywordGroupColors';
+  const GROUP_COLOR_PALETTE = ['#DDEBE3', '#E2EAF7', '#EEE5F5', '#F5E8DD', '#F4E8EB', '#E8EDDD'];
   const BACKUP_FORMAT = 'xiaoyu-tab-manager-shortcuts';
   const MAX_BACKUP_BYTES = 2 * 1024 * 1024;
   const MAX_BACKUP_MAPPINGS = 5000;
@@ -9,6 +11,35 @@
   /** 忽略大小写和多余空白，但不对关键词做模糊语义推断。 */
   function normalizeKeyword(value) {
     return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').toLowerCase() : '';
+  }
+
+  /** 严格解析不透明 HEX/RGB，将用户色码统一为安全的六位 HEX。 */
+  function normalizeGroupColor(value) {
+    const text = typeof value === 'string' ? value.trim() : '';
+    if (/^#[\da-f]{6}$/i.test(text)) return text.toUpperCase();
+    if (/^#[\da-f]{3}$/i.test(text)) return '#' + [...text.slice(1)].map(char => char + char).join('').toUpperCase();
+    const rgb = /^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/i.exec(text);
+    if (rgb && rgb.slice(1).every(channel => Number(channel) <= 255)) {
+      return '#' + rgb.slice(1).map(channel => Number(channel).toString(16).padStart(2, '0')).join('').toUpperCase();
+    }
+    throw new Error('keywordInvalidGroupColor');
+  }
+
+  /** 从已校验的分组偏好读取颜色，未设置时按组名稳定选择淡雅默认色。 */
+  function getGroupColor(keyword, colors = {}) {
+    const key = normalizeKeyword(keyword);
+    if (Object.hasOwn(colors, key)) return colors[key];
+    let hash = 0;
+    for (const char of key) hash = (Math.imul(hash, 31) + char.codePointAt(0)) >>> 0;
+    return GROUP_COLOR_PALETTE[hash % GROUP_COLOR_PALETTE.length];
+  }
+
+  /** 按 WCAG 相对亮度选择黑白文字，保证任意自选底色的可读性。 */
+  function getGroupTextColor(color) {
+    const channels = [1, 3, 5].map(offset => parseInt(color.slice(offset, offset + 2), 16) / 255)
+      .map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
+    const luminance = channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722;
+    return luminance > .179 ? '#000000' : '#FFFFFF';
   }
 
   /** 规范化多别名，拒绝未知类型并按忽略大小写的完整文本去重。 */
@@ -122,6 +153,33 @@
       return result;
     }
 
+    /** 独立读取配色；坏数据明确报错，不影响原映射的读取和备份。 */
+    async function getGroupColors() {
+      const raw = (await storage.get(GROUP_COLORS_KEY))[GROUP_COLORS_KEY];
+      if (raw === undefined) return {};
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('keywordGroupColorLoadError');
+      try {
+        return Object.fromEntries(Object.entries(raw).map(([key, color]) => {
+          if (!key || normalizeKeyword(key) !== key) throw new Error('invalid-group-key');
+          return [key, normalizeGroupColor(color)];
+        }));
+      } catch { throw new Error('keywordGroupColorLoadError'); }
+    }
+
+    /** 在既有跨页写锁内保存一组颜色，null 明确表示恢复该组默认色。 */
+    function setGroupColor(keyword, value) {
+      return mutate(async () => {
+        const key = normalizeKeyword(keyword);
+        if (!key) throw new Error('keywordRequired');
+        const color = value === null ? null : normalizeGroupColor(value);
+        let colors = await getGroupColors();
+        if (color === null) delete colors[key];
+        else colors = { ...colors, [key]: color };
+        await storage.set({ [GROUP_COLORS_KEY]: colors });
+        return colors;
+      });
+    }
+
     /** 添加或更新单条映射；写入成功前不修改调用方列表。 */
     function save(draft) {
       return mutate(async () => {
@@ -173,10 +231,11 @@
       });
     }
 
-    return { list, save, remove, exportBackup, previewImport, importBackup };
+    return { list, save, remove, exportBackup, previewImport, importBackup, getGroupColors, setGroupColor };
   }
 
-  const api = { STORAGE_KEY, MAX_BACKUP_BYTES, normalizeKeyword, normalizeAliases, validateMapping, findMappings, parseBackup, createService };
+  const api = { STORAGE_KEY, GROUP_COLORS_KEY, MAX_BACKUP_BYTES, normalizeKeyword, normalizeAliases, validateMapping, findMappings, parseBackup, createService,
+    normalizeGroupColor, getGroupColor, getGroupTextColor };
   global.XiaoyuKeywordMappings = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(globalThis);
