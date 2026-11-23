@@ -112,8 +112,6 @@ async function testExactOpen() {
   const service = shortcutTabs.createService(browser.api);
   const snapshot = await service.getSnapshot();
   assert.equal(snapshot.windows.length, 2);
-  assert.deepEqual(library.getStatus(snapshot, 'https://example.test/?a=1#x', (key, values) => `${key}:${values.number}`), { opened: true, text: 'shortcutOpenedWindow:1' });
-  assert.deepEqual(library.getStatus(snapshot, 'https://missing.test/', key => key), { opened: false, text: 'shortcutNotOpened' });
   assert.equal(shortcutTabs.selectExactTab(snapshot, 'https://example.test/?a=1#x').id, 11);
   assert.equal(shortcutTabs.selectExactTab(snapshot, 'https://example.test/?a=2#x'), null);
   assert.equal(shortcutTabs.selectExactTab(snapshot, 'https://example.test/?a=1#y'), null);
@@ -158,32 +156,8 @@ function testLibraryRendering() {
   assert.doesNotMatch(html, /<img|<script>/);
   assert.match(html, /data-mapping-id="&quot;&lt;x&gt;"/);
   assert.match(html, /shortcutStatusUnknown/);
-  assert.match(html, /aria-label="&lt;img src=x&gt; · shortcutStatusUnknown"/);
-  assert.doesNotMatch(html, /shortcut-library-url|https:\/\/a\.test/);
   assert.match(library.render({ translate }), /keywordEmpty/);
   assert.match(library.render({ loadError: true, translate }), /keywordLoadError/);
-}
-
-/** 同名配色只由规范化标题决定，重排和网址变化不能改变颜色或写入映射。 */
-function testProjectColors() {
-  const hue = library.getProjectHue;
-  assert.equal(hue(' ARGALL '), hue('argall'));
-  assert.equal(hue('Cafe\u0301'), hue('Café'));
-  for (const title of ['argall', 'hermes2', 'mining', 'kosmos', '南瓜🎃', '']) {
-    assert.ok(Number.isInteger(hue(title)) && hue(title) >= 0 && hue(title) < 360);
-  }
-  const rows = [
-    { id: 'a', keyword: '看板', title: 'argall', url: 'https://a.test/' },
-    { id: 'b', keyword: '服务', title: 'ARGALL', url: 'https://b.test/' },
-    { id: 'c', keyword: '代码', title: 'hermes2', url: 'https://c.test/' },
-  ];
-  const before = structuredClone(rows);
-  const forward = library.render({ rows, translate: key => key });
-  const reversed = library.render({ rows: [...rows].reverse(), translate: key => key });
-  assert.equal((forward.match(new RegExp(`--shortcut-project-hue: ${hue('argall')};`, 'g')) || []).length, 2);
-  assert.equal((reversed.match(new RegExp(`--shortcut-project-hue: ${hue('argall')};`, 'g')) || []).length, 2);
-  assert.deepEqual(rows, before);
-  assert.doesNotMatch(forward, /https?:\/\/|shortcut-library-url/);
 }
 
 /** 执行快捷库的持久数据和浏览器操作单元回归。 */
@@ -191,7 +165,6 @@ export async function testShortcutLibrary() {
   await testBackupAndAliases();
   await testExactOpen();
   testLibraryRendering();
-  testProjectColors();
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

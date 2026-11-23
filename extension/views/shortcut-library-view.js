@@ -13,16 +13,7 @@
     }) } : { opened: false, text: translate('shortcutNotOpened') };
   }
 
-  /** 只按规范化名称计算固定色相，同名跨组及重排后同色，不写入存储。 */
-  function getProjectHue(title) {
-    let hash = 2166136261;
-    for (const character of title.normalize('NFC').trim().toLowerCase()) {
-      hash = Math.imul(hash ^ character.codePointAt(0), 16777619);
-    }
-    return (hash >>> 0) % 360;
-  }
-
-  /** 生成同名同色的方形快捷入口，保留原映射身份并转义全部名称。 */
+  /** 生成与现有组织视图一致的分组卡片，所有用户数据必须转义。 */
   function render({ rows = [], tabSnapshot = null, loadError = false, translate }) {
     const escape = html.escapeHtml;
     const toolbar = `<div class="shortcut-library-toolbar"><p>${escape(translate('shortcutLibraryHelp'))}</p>
@@ -41,17 +32,16 @@
             <span class="open-tabs-badge">${escape(translate('keywordPageCount', { count: group.length }))}</span></div>
           <div class="mission-pages">${group.map(row => {
             const state = getStatus(tabSnapshot, row.url, translate);
-            const label = escape(`${row.title} · ${state.text}`);
-            return `<button type="button" class="shortcut-library-row" data-action="open-shortcut" data-mapping-id="${escape(row.id)}"
-              style="--shortcut-project-hue: ${getProjectHue(row.title)};" title="${label}" aria-label="${label}">
-              <span class="shortcut-library-title">${escape(row.title)}</span>
-              <span class="shortcut-open-state${state.opened ? ' is-open' : ''}" aria-hidden="true"></span></button>`;
+            return `<button type="button" class="shortcut-library-row" data-action="open-shortcut" data-mapping-id="${escape(row.id)}" title="${escape(row.url)}">
+              <span class="shortcut-library-copy"><span class="chip-text">${escape(row.title)}</span><span class="shortcut-library-url">${escape(row.url)}</span></span>
+              <span class="shortcut-open-state${state.opened ? ' is-open' : ''}">${escape(state.text)}</span>
+              <span class="shortcut-library-arrow" aria-hidden="true">↗</span></button>`;
           }).join('')}</div>
         </div>
       </section>`).join('')}</div>`;
   }
 
-  const api = { getStatus, getProjectHue, render };
+  const api = { getStatus, render };
   global.XiaoyuShortcutLibrary = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(globalThis);
