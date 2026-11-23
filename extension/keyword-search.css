@@ -169,15 +169,16 @@
 .shortcut-library-toolbar button { flex-shrink: 0; }
 .shortcut-library-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 18px; grid-column: 1 / -1; align-items: start; }
 .shortcut-library-card { min-width: 0; }
-.shortcut-library-row { display: flex; width: 100%; align-items: center; gap: 12px; border: 0; border-bottom: 1px solid var(--hairline); padding: 13px 0; background: transparent; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
-.shortcut-library-row:last-child { border-bottom: 0; }
-.shortcut-library-row:hover { background: color-mix(in srgb, var(--accent-sage) 7%, transparent); }
-.shortcut-library-copy { display: grid; gap: 5px; min-width: 0; flex: 1; }
-.shortcut-library-copy .chip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.shortcut-library-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font: 11px var(--font-sans); }
+.shortcut-library-card .organization-card-header { margin-bottom: 18px; }
+.shortcut-library-card .mission-pages { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 88px), 1fr)); gap: 12px; }
+.shortcut-library-row { --shortcut-project-color: hsl(var(--shortcut-project-hue) 45% 58%); position: relative; display: grid; place-items: center; width: 100%; min-width: 0; min-height: 0; aspect-ratio: 1; box-sizing: border-box; overflow: hidden; border: 1px solid color-mix(in srgb, var(--shortcut-project-color) 26%, var(--hairline)); border-radius: 14px; padding: 18px 12px; background: color-mix(in srgb, var(--shortcut-project-color) 16%, var(--surface-raised)); color: var(--ink); text-align: center; font: 600 var(--font-size-body)/1.45 var(--font-sans); cursor: pointer; transition: background-color .15s ease, border-color .15s ease; }
+.shortcut-library-row:hover { background: color-mix(in srgb, var(--shortcut-project-color) 24%, var(--surface-raised)); border-color: color-mix(in srgb, var(--shortcut-project-color) 50%, var(--hairline)); }
+.shortcut-library-title { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; min-height: 0; overflow: hidden; overflow-wrap: anywhere; max-width: 100%; max-height: 100%; }
 .shortcut-open-state { color: var(--muted); font: 10px/1.5 var(--font-sans); white-space: nowrap; }
 .shortcut-open-state.is-open { color: var(--accent-sage); }
-.shortcut-library-arrow { color: var(--muted); font-size: 17px; }
+.shortcut-library-row .shortcut-open-state { position: absolute; top: 10px; right: 10px; width: 7px; height: 7px; box-sizing: border-box; border: 1px solid var(--muted); border-radius: 50%; }
+.shortcut-library-row .shortcut-open-state.is-open { background: var(--accent-sage); border-color: var(--accent-sage); }
+@media (prefers-reduced-motion: reduce) { .shortcut-library-row { transition: none; } }
 .shortcut-context-menu { position: fixed; z-index: 10020; min-width: 150px; padding: 5px; border: 1px solid var(--hairline); border-radius: 9px; background: var(--surface-raised); box-shadow: 0 8px 28px var(--shadow); }
 .shortcut-context-menu button { width: 100%; border: 0; border-radius: 5px; padding: 10px 13px; background: transparent; color: var(--ink); text-align: left; font: 12px var(--font-sans); cursor: pointer; }
 .shortcut-context-menu button:hover { background: color-mix(in srgb, var(--accent-sage) 13%, transparent); }
