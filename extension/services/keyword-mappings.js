@@ -13,6 +13,16 @@
     return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').toLowerCase() : '';
   }
 
+  /** 按稳定标识相对移动一项，拒绝失效目标及未知位置，不修改输入数组。 */
+  function moveRelative(order, source, target, position) {
+    if (!['before', 'after'].includes(position) || !order.includes(source) || !order.includes(target)) throw new Error('keywordSortChanged');
+    const next = [...order];
+    if (source === target) return next;
+    next.splice(next.indexOf(source), 1);
+    next.splice(next.indexOf(target) + (position === 'after' ? 1 : 0), 0, source);
+    return next;
+  }
+
   /** 严格解析不透明 HEX/RGB，将用户色码统一为安全的六位 HEX。 */
   function normalizeGroupColor(value) {
     const text = typeof value === 'string' ? value.trim() : '';
@@ -203,6 +213,45 @@
       });
     }
 
+    /** 在最新快照上整体移动一组，组内次序及全部字段保持不变。 */
+    function reorderGroups(source, target, position) {
+      return mutate(async () => {
+        const rows = await list();
+        const groups = new Map();
+        for (const row of rows) {
+          const key = normalizeKeyword(row.keyword);
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(row);
+        }
+        const order = [...groups.keys()];
+        const next = moveRelative(order, normalizeKeyword(source), normalizeKeyword(target), position);
+        if (next.every((key, index) => key === order[index])) return false;
+        await storage.set({ [STORAGE_KEY]: next.flatMap(key => groups.get(key)) });
+        console.info('[Xiaoyu shortcuts] Group order persisted', { count: groups.size });
+        return true;
+      });
+    }
+
+    /** 只重排同组页面占用的位置，保留其他组、并发新增及原始映射内容。 */
+    function reorderPages(source, target, position) {
+      return mutate(async () => {
+        const rows = await list();
+        const sourceRow = rows.find(row => row.id === source);
+        const targetRow = rows.find(row => row.id === target);
+        if (!sourceRow || !targetRow || normalizeKeyword(sourceRow.keyword) !== normalizeKeyword(targetRow.keyword)) throw new Error('keywordSortChanged');
+        const key = normalizeKeyword(sourceRow.keyword);
+        const group = rows.filter(row => normalizeKeyword(row.keyword) === key);
+        const order = group.map(row => row.id);
+        const next = moveRelative(order, source, target, position);
+        if (next.every((id, index) => id === order[index])) return false;
+        const byId = new Map(group.map(row => [row.id, row]));
+        let index = 0;
+        await storage.set({ [STORAGE_KEY]: rows.map(row => normalizeKeyword(row.keyword) === key ? byId.get(next[index++]) : row) });
+        console.info('[Xiaoyu shortcuts] Page order persisted', { count: group.length });
+        return true;
+      });
+    }
+
     /** 添加或更新单条映射；写入成功前不修改调用方列表。 */
     function save(draft) {
       return mutate(async () => {
@@ -254,7 +303,7 @@
       });
     }
 
-    return { list, save, remove, exportBackup, previewImport, importBackup, getGroupColors, setGroupColor, renameGroup };
+    return { list, save, remove, exportBackup, previewImport, importBackup, getGroupColors, setGroupColor, renameGroup, reorderGroups, reorderPages };
   }
 
   const api = { STORAGE_KEY, GROUP_COLORS_KEY, MAX_BACKUP_BYTES, normalizeKeyword, normalizeAliases, validateMapping, findMappings, parseBackup, createService,

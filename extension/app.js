@@ -362,8 +362,9 @@ function saveOrganizationPreferences() {
   } catch {}
 }
 
-/** 切换一级或工作二级视图，并同步旧 viewMode 以保持兼容。 */
+/** 切换视图前清理未提交的快捷拖拽，并同步旧 viewMode 以保持兼容。 */
 async function setOrganizationView(view, workspaceView = activeWorkspaceView) {
+  shortcutController?.cancelSort();
   activeOrganizationView = ORGANIZATION_VIEWS.has(view) ? view : 'domain';
   activeWorkspaceView = WORKSPACE_VIEWS.has(workspaceView) ? workspaceView : 'arrange';
   saveOrganizationPreferences();
@@ -750,6 +751,10 @@ const UI_COPY = {
     keywordExportError: 'Could not export the backup. Please try again.',
     keywordImported: 'Mappings merged. Existing names and URLs were preserved.',
     shortcutNewCopy: 'Open a new copy',
+    /** 为两层排序柄说明鼠标和键盘操作。 */
+    shortcutSortHandle: ({ name }) => `Drag to reorder, or Alt + ↑ / ↓ · ${name}`,
+    shortcutSortSaved: 'Order saved.',
+    shortcutSortError: 'Could not save the order. Please try again.',
     shortcutCapture: 'Add to shortcuts',
     shortcutCaptureError: 'Could not capture this page. It may have closed or changed.',
     shortcutStatusUnknown: 'Status unavailable',
@@ -1043,6 +1048,10 @@ const UI_COPY = {
     keywordExportError: '备份导出失败，请重试。',
     keywordImported: '已合并映射，保留了已有名称和网址。',
     shortcutNewCopy: '新开副本',
+    /** 为两层排序柄说明鼠标和键盘操作。 */
+    shortcutSortHandle: ({ name }) => `拖拽排序，或使用 Alt + ↑ / ↓ · ${name}`,
+    shortcutSortSaved: '排序已保存。',
+    shortcutSortError: '保存排序失败，请重试。',
     shortcutCapture: '加入快捷搜索',
     shortcutCaptureError: '收录失败，该标签可能已关闭或变址，请重试。',
     shortcutStatusUnknown: '状态暂不可用',
@@ -3553,12 +3562,17 @@ async function renderWindowOrganizationView() {
   ensureOrganizationDragController();
 }
 
-/** 渲染持久映射卡片，关闭网页不会移除快捷入口。 */
+/** 渲染持久映射卡片；排序期间延后写 DOM，重绘后保留键盘排序柄的焦点。 */
 async function renderShortcutLibraryView() {
   const missions = document.getElementById('openTabsMissions');
   if (!missions || !shortcutController) return;
   const snapshot = await shortcutController.getSnapshot();
+  if (shortcutController.isSorting()) { organizationRefreshQueued = true; return; }
+  const focused = missions.contains(document.activeElement) && document.activeElement.matches('[data-shortcut-sort]')
+    ? { kind: document.activeElement.dataset.shortcutSort, id: document.activeElement.dataset.sortId } : null;
   missions.innerHTML = window.XiaoyuShortcutLibrary.render({ ...snapshot, translate: tr });
+  if (focused) [...missions.querySelectorAll('[data-shortcut-sort]')]
+    .find(handle => handle.dataset.shortcutSort === focused.kind && handle.dataset.sortId === focused.id)?.focus({ preventScroll: true });
   document.getElementById('openTabsSectionTitle').textContent = tr('organizationShortcuts');
   document.getElementById('openTabsSectionCount').textContent = snapshot.loadError ? '' : tr('keywordPageCount', { count: snapshot.rows.length });
 }
@@ -5215,8 +5229,9 @@ async function initPrivacyMode() {
 let _tabRefreshTimer = null;
 let _initialRenderDone = false;
 
+/** 合并浏览器刷新事件，组织拖拽、快捷排序或窗口操作期间延后替换卡片。 */
 function scheduleRefresh() {
-  if (organizationDragActive || workspaceOperations?.isBusy?.()) {
+  if (organizationDragActive || workspaceOperations?.isBusy?.() || shortcutController?.isSorting()) {
     organizationRefreshQueued = true;
     return;
   }
@@ -5225,6 +5240,7 @@ function scheduleRefresh() {
     // While privacy mode covers the dashboard, skip the re-render — the
     // user can't see it, and we'd be thrashing the DOM behind the lock.
     if (document.body.classList.contains('privacy-mode')) return;
+    if (shortcutController?.isSorting()) { organizationRefreshQueued = true; return; }
     // Entrance animations are a one-shot greeting; don't replay them on
     // every tab event or the dashboard flickers as tabs come and go.
     if (_initialRenderDone) document.body.classList.add('no-entrance-anim');
@@ -5288,7 +5304,9 @@ window.XiaoyuTabReuseSettings?.init({ translate: tr, selectView: setSettingsView
   automaticDashboardCleanupEnabled = enabled;
   checkTabOutDupes();
 } });
-shortcutController = window.XiaoyuKeywordSearch?.init({ translate: tr, notify: showToast });
+shortcutController = window.XiaoyuKeywordSearch?.init({ translate: tr, notify: showToast, onSortEnd: () => {
+  if (organizationRefreshQueued) { organizationRefreshQueued = false; scheduleRefresh(); }
+} });
 document.addEventListener('xiaoyu-shortcuts-changed', () => {
   if (activeOrganizationView === 'shortcuts') scheduleRefresh();
 });

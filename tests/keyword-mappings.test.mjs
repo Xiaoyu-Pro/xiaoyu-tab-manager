@@ -101,10 +101,70 @@ async function testGroupRename() {
   assert.deepEqual(data, damaged);
 }
 
-/** 回归分组配色、改名、跨组匹配、完整网址、增改删持久化及失败隔离。 */
+/** 验证两层相对排序、无效目标和失败隔离，并保留并发新增、颜色与备份次序。 */
+async function testOrdering() {
+  const data = { keywordPageMappings: [
+    { id: 'a1', keyword: 'A', title: 'A1', url: 'https://example.test/a?b=2&a=1#x', aliases: ['a'] },
+    { id: 'b1', keyword: 'B', title: 'B1', url: 'https://example.test/b', aliases: [] },
+    { id: 'a2', keyword: 'a', title: 'A2', url: 'https://example.test/a2', aliases: [] },
+    { id: 'c1', keyword: 'C', title: 'C1', url: 'https://example.test/c', aliases: [] },
+  ], keywordGroupColors: { a: '#ABCDEF' } };
+  let failWrite = false;
+  let writes = 0;
+  const storage = {
+    /** 读取互不共享引用的最新本地数据。 */
+    async get(key) { return structuredClone({ [key]: data[key] }); },
+    /** 记录排序只写映射键；失败不修改任何数据。 */
+    async set(value) { if (failWrite) throw new Error('quota'); writes++; Object.assign(data, structuredClone(value)); },
+  };
+  const service = mappings.createService(storage, () => 'new');
+  const original = await service.list();
+  assert.equal(await service.reorderPages('a2', 'a1', 'before'), true);
+  assert.deepEqual((await service.list()).map(row => row.id), ['a2', 'b1', 'a1', 'c1']);
+  assert.equal(await service.reorderGroups(' C ', 'a', 'before'), true);
+  assert.deepEqual((await service.list()).map(row => row.id), ['c1', 'a2', 'a1', 'b1']);
+  const saved = structuredClone(data);
+  const written = writes;
+  assert.equal(await service.reorderPages('a2', 'a1', 'before'), false);
+  assert.equal(await service.reorderGroups('C', 'C', 'after'), false);
+  assert.equal(writes, written);
+  for (const operation of [() => service.reorderPages('a1', 'b1', 'after'),
+    () => service.reorderPages('gone', 'a1', 'before'), () => service.reorderGroups('A', 'gone', 'before'),
+    () => service.reorderGroups('A', 'B', 'middle')]) {
+    await assert.rejects(operation(), /keywordSortChanged/);
+    assert.deepEqual(data, saved);
+  }
+  failWrite = true;
+  await assert.rejects(service.reorderGroups('C', 'B', 'after'), /quota/);
+  assert.deepEqual(data, saved);
+  failWrite = false;
+  await Promise.all([service.reorderPages('a1', 'a2', 'before'), service.save({ keyword: 'B', title: 'New', url: 'https://example.test/new' })]);
+  assert.deepEqual((await service.list()).map(row => row.id), ['c1', 'a1', 'a2', 'b1', 'new']);
+  for (const row of original) assert.deepEqual((await service.list()).find(item => item.id === row.id), row);
+  assert.deepEqual(data.keywordGroupColors, { a: '#ABCDEF' });
+  const beforeRename = (await service.list()).map(row => row.id);
+  await service.renameGroup('A', 'Renamed');
+  assert.deepEqual((await service.list()).map(row => row.id), beforeRename);
+  const backup = mappings.parseBackup(await service.exportBackup());
+  assert.deepEqual(backup.map(row => row.title), ['C1', 'A1', 'A2', 'B1', 'New']);
+  const restored = {};
+  let restoredId = 0;
+  const restoredService = mappings.createService({
+    /** 模拟另一台空配置读取备份恢复状态。 */
+    async get(key) { return structuredClone({ [key]: restored[key] }); },
+    /** 保留导入写入的数组顺序。 */
+    async set(value) { Object.assign(restored, structuredClone(value)); },
+  }, () => `restored-${++restoredId}`);
+  await restoredService.importBackup(await service.exportBackup());
+  assert.deepEqual((await restoredService.list()).map(({ id, ...row }) => row), backup);
+  assert.deepEqual((await mappings.createService(storage).list()).map(row => row.id), beforeRename);
+}
+
+/** 回归分组配色、改名、排序、跨组匹配、完整网址、持久化及失败隔离。 */
 export async function testKeywordMappings() {
   await testGroupColors();
   await testGroupRename();
+  await testOrdering();
   const data = {};
   let failWrite = false;
   let nextId = 0;

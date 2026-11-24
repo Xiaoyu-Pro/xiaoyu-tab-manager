@@ -159,6 +159,9 @@ function testLibraryRendering() {
   assert.match(html, /class="keyword-group-swatch"/);
   assert.match(html, /data-action="color-shortcut-group" data-keyword="&lt;script&gt;group"/);
   assert.match(html, /data-action="edit-shortcut-group" data-keyword="&lt;script&gt;group"/);
+  assert.match(html, /data-shortcut-sort="group"/);
+  assert.match(html, /data-shortcut-sort="page"/);
+  assert.match(html, /aria-keyshortcuts="Alt\+ArrowUp Alt\+ArrowDown"/);
   assert.match(library.render({ rows: [{ id: 'color', keyword: 'tce', title: 'project', url: 'https://a.test/' }],
     groupColors: { tce: '#123456' }, translate }), /background-color: #123456/);
   assert.match(library.render({ translate }), /keywordEmpty/);

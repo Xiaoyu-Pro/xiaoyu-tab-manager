@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { testKeywordSearch } from '../tests/keyword-search-browser.mjs';
 import { testShortcutLibraryBrowser } from '../tests/shortcut-library-browser.mjs';
 import { testDashboardCleanupBrowser } from '../tests/dashboard-cleanup-browser.mjs';
+import { testShortcutOrderingBrowser } from '../tests/shortcut-order-browser.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const extensionDir = process.env.EXTENSION_DIR ? resolve(process.env.EXTENSION_DIR) : join(root, 'extension');
@@ -249,6 +250,7 @@ async function main() {
     await page.waitFor('document.querySelector("#themeCurrentBtn")');
     await testKeywordSearch(page, extensionBase);
     await testShortcutLibraryBrowser(page, extensionBase);
+    await testShortcutOrderingBrowser(page, extensionBase);
     await page.waitFor('document.querySelectorAll("[data-organization-view]").length === 4');
     const brandState = await page.evaluate(`({
       title: document.title,

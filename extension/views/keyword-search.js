@@ -2,8 +2,8 @@
 (function (global) {
   'use strict';
 
-  /** 把独立搜索、管理表单和本地映射服务连接到现有仪表盘。 */
-  function init({ translate, notify }) {
+  /** 连接搜索、管理与快捷排序；排序结束时通知仪表盘补做被延后的重绘。 */
+  function init({ translate, notify, onSortEnd }) {
     const root = document.getElementById('keywordSearch');
     const input = document.getElementById('keywordSearchInput');
     const dropdown = document.getElementById('keywordSearchResults');
@@ -27,6 +27,7 @@
     const colorPreview = document.getElementById('keywordGroupColorPreview');
     const groupForm = document.getElementById('keywordGroupNameForm');
     const groupName = document.getElementById('keywordGroupName');
+    const libraryRoot = document.getElementById('openTabsMissions');
     if (!root || !global.XiaoyuKeywordMappings || !global.SuperTabOutStorage) return;
     const api = global.XiaoyuKeywordMappings;
     const service = api.createService();
@@ -54,6 +55,110 @@
     let refreshId = 0;
     const groupExpansion = new Map();
     let groupToExpand = '';
+    let sortState = null;
+    let sortTarget = null;
+    let sortSaving = false;
+
+    /** 拖拽及持久化期间暂停外部卡片重绘，避免替换手中的源节点。 */
+    function isSorting() { return Boolean(sortState) || sortSaving; }
+
+    /** 清除旧投放标记，不改动卡片或页面的原始顺序。 */
+    function clearSortTarget() {
+      if (sortTarget) {
+        delete sortTarget.dataset.shortcutDropAxis;
+        delete sortTarget.dataset.shortcutDropPosition;
+      }
+      sortTarget = null;
+    }
+
+    /** 取消本轮拖拽；已经提交的保存仍等待完成，不伪装撤销存储写入。 */
+    function cancelSort() {
+      sortState?.node.classList.remove('shortcut-sort-source');
+      sortState = null;
+      clearSortTarget();
+      if (!sortSaving) onSortEnd?.();
+    }
+
+    /** 只接受同一快捷库的有效落点；多列按左右、单列及页面按上下决定前后。 */
+    function resolveSortTarget(event) {
+      if (!sortState) return null;
+      const node = event.target.closest(sortState.kind === 'group' ? '.shortcut-library-card' : '.shortcut-library-item');
+      if (!node || !libraryRoot.contains(node)) return null;
+      const id = sortState.kind === 'group' ? node.dataset.shortcutGroup : node.dataset.shortcutId;
+      if (id === sortState.id || (sortState.kind === 'page' && node.dataset.shortcutGroup !== sortState.group)) return null;
+      const rect = node.getBoundingClientRect();
+      const axis = sortState.kind === 'group' && getComputedStyle(node.parentElement).gridTemplateColumns.split(' ').length > 1 ? 'x' : 'y';
+      const after = axis === 'x' ? event.clientX > rect.left + rect.width / 2 : event.clientY > rect.top + rect.height / 2;
+      return { node, id, axis, position: after ? 'after' : 'before' };
+    }
+
+    /** 用同一锁内接口保存鼠标或键盘排序，成功后才刷新；失败保留旧 DOM 顺序。 */
+    async function saveOrder(kind, source, target, position) {
+      if (sortSaving) return;
+      sortSaving = true;
+      cancelSort();
+      try {
+        const changed = await (kind === 'group' ? service.reorderGroups(source, target, position) : service.reorderPages(source, target, position));
+        if (changed) {
+          await refresh();
+          notify?.(translate('shortcutSortSaved'));
+        }
+      } catch (error) {
+        console.warn('[Xiaoyu shortcuts] Order not saved', { kind, reason: error?.message === 'keywordSortChanged' ? 'items-changed' : 'storage-or-data-error' });
+        notify?.(translate('shortcutSortError'));
+      }
+      finally { sortSaving = false; cancelSort(); }
+    }
+
+    /** 只从独立柄启动本页排序，拖拽载荷不携带名称或内部网址。 */
+    function startSort(event) {
+      const handle = event.target.closest('[data-shortcut-sort]');
+      if (!handle) return;
+      if (busy || isSorting() || document.body.classList.contains('privacy-mode')) { event.preventDefault(); return; }
+      const kind = handle.dataset.shortcutSort;
+      const node = handle.closest(kind === 'group' ? '.shortcut-library-card' : '.shortcut-library-item');
+      sortState = { kind, id: handle.dataset.sortId, group: node.dataset.shortcutGroup, node };
+      node.classList.add('shortcut-sort-source');
+      event.dataTransfer.setData('application/x-xiaoyu-shortcut-sort', '1');
+      event.dataTransfer.effectAllowed = 'move';
+      closeMenu();
+    }
+
+    /** 标记合法落点；外部拖入、自己和跨组页面不接管。 */
+    function dragOverSort(event) {
+      const target = resolveSortTarget(event);
+      clearSortTarget();
+      if (!target) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      sortTarget = target.node;
+      sortTarget.dataset.shortcutDropAxis = target.axis;
+      sortTarget.dataset.shortcutDropPosition = target.position;
+    }
+
+    /** 松手时重新核实落点，异步保存期间继续冻结卡片重绘。 */
+    function dropSort(event) {
+      const target = resolveSortTarget(event);
+      if (!target) { cancelSort(); return; }
+      event.preventDefault();
+      saveOrder(sortState.kind, sortState.id, target.id, target.position);
+    }
+
+    /** Alt+上下键移动到相邻位置，Esc 取消未提交拖动；边界及保存中不重复写入。 */
+    function keyboardSort(event) {
+      if (event.key === 'Escape' && sortState) { event.stopPropagation(); cancelSort(); return; }
+      const handle = event.target.closest('[data-shortcut-sort]');
+      if (!handle || !event.altKey || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (busy || isSorting()) return;
+      const kind = handle.dataset.shortcutSort;
+      const source = handle.closest(kind === 'group' ? '.shortcut-library-card' : '.shortcut-library-item');
+      const items = [...(kind === 'group' ? libraryRoot.querySelectorAll('.shortcut-library-card') : source.parentElement.querySelectorAll('.shortcut-library-item'))];
+      const target = items[items.indexOf(source) + (event.key === 'ArrowUp' ? -1 : 1)];
+      if (target) saveOrder(kind, handle.dataset.sortId, kind === 'group' ? target.dataset.shortcutGroup : target.dataset.shortcutId,
+        event.key === 'ArrowUp' ? 'before' : 'after');
+    }
 
     /** 使用纯文本构造节点，不把用户名称或 URL 插入 HTML。 */
     function element(tag, className, text) {
@@ -579,6 +684,11 @@
     }
 
     input.addEventListener('focus', () => { openResults(); if (!loaded || loadError) refresh(); });
+    libraryRoot.addEventListener('dragstart', startSort);
+    libraryRoot.addEventListener('dragover', dragOverSort);
+    libraryRoot.addEventListener('drop', dropSort);
+    libraryRoot.addEventListener('dragend', cancelSort);
+    libraryRoot.addEventListener('keydown', keyboardSort);
     input.addEventListener('input', () => { selected = 0; openResults(); });
     root.addEventListener('keydown', event => {
       if (event.isComposing || event.keyCode === 229) return;
@@ -698,12 +808,13 @@
     });
     new MutationObserver(() => {
       if (!document.body.classList.contains('privacy-mode')) return;
+      cancelSort();
       closeResults();
       closeMenu();
       if (dialog.open) dialog.close();
     }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
     refresh();
-    return { getSnapshot, decorateTabs, openManager };
+    return { getSnapshot, decorateTabs, openManager, isSorting, cancelSort };
   }
 
   global.XiaoyuKeywordSearch = { init };

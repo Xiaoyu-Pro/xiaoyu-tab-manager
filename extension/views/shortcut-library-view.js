@@ -14,7 +14,14 @@
     }) } : { opened: false, text: translate('shortcutNotOpened') };
   }
 
-  /** 保留原链接列表，在组名旁提供配色入口、右上角提供分组编辑，名称全部转义。 */
+  /** 使用独立按钮提供拖拽与键盘排序，避免嵌套在页面打开按钮内。 */
+  function sortHandle(kind, id, name, translate) {
+    const escape = html.escapeHtml;
+    const label = escape(translate('shortcutSortHandle', { name }));
+    return `<button type="button" class="shortcut-sort-handle" draggable="true" data-shortcut-sort="${kind}" data-sort-id="${escape(id)}" aria-label="${label}" title="${label}" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"><span aria-hidden="true">⠿</span></button>`;
+  }
+
+  /** 保留原链接列表，并为组和页面提供独立拖拽柄及既有配色、编辑入口。 */
   function render({ rows = [], tabSnapshot = null, loadError = false, groupColors = {}, translate }) {
     const escape = html.escapeHtml;
     const toolbar = `<div class="shortcut-library-toolbar"><p>${escape(translate('shortcutLibraryHelp'))}</p>
@@ -27,16 +34,16 @@
       groups.get(key).push(row);
     }
     return toolbar + `<div class="shortcut-library-grid">${[...groups.values()].map(group => `
-      <section class="mission-card organization-card shortcut-library-card">
+      <section class="mission-card organization-card shortcut-library-card" data-shortcut-group="${escape(mappings.normalizeKeyword(group[0].keyword))}">
         <div class="mission-content">
-          <div class="organization-card-header"><div class="shortcut-group-heading"><span class="mission-name">${escape(group[0].keyword)}</span><button type="button" class="shortcut-group-color-trigger" data-action="color-shortcut-group" data-keyword="${escape(group[0].keyword)}" title="${escape(translate('keywordGroupColorButton', { group: group[0].keyword }))}" aria-label="${escape(translate('keywordGroupColorButton', { group: group[0].keyword }))}" aria-haspopup="dialog"><span class="keyword-group-swatch" style="background-color: ${mappings.getGroupColor(group[0].keyword, groupColors)}" aria-hidden="true"></span></button></div>
+          <div class="organization-card-header"><div class="shortcut-group-heading">${sortHandle('group', mappings.normalizeKeyword(group[0].keyword), group[0].keyword, translate)}<span class="mission-name">${escape(group[0].keyword)}</span><button type="button" class="shortcut-group-color-trigger" data-action="color-shortcut-group" data-keyword="${escape(group[0].keyword)}" title="${escape(translate('keywordGroupColorButton', { group: group[0].keyword }))}" aria-label="${escape(translate('keywordGroupColorButton', { group: group[0].keyword }))}" aria-haspopup="dialog"><span class="keyword-group-swatch" style="background-color: ${mappings.getGroupColor(group[0].keyword, groupColors)}" aria-hidden="true"></span></button></div>
             <div class="shortcut-group-actions"><span class="open-tabs-badge">${escape(translate('keywordPageCount', { count: group.length }))}</span><button type="button" class="shortcut-group-edit" data-action="edit-shortcut-group" data-keyword="${escape(group[0].keyword)}" aria-label="${escape(translate('keywordGroupEditTitle', { group: group[0].keyword }))}" aria-haspopup="dialog">${escape(translate('keywordEdit'))}</button></div></div>
           <div class="mission-pages">${group.map(row => {
             const state = getStatus(tabSnapshot, row.url, translate);
-            return `<button type="button" class="shortcut-library-row" data-action="open-shortcut" data-mapping-id="${escape(row.id)}" title="${escape(row.url)}">
+            return `<div class="shortcut-library-item" data-shortcut-id="${escape(row.id)}" data-shortcut-group="${escape(mappings.normalizeKeyword(row.keyword))}">${sortHandle('page', row.id, row.title, translate)}<button type="button" class="shortcut-library-row" data-action="open-shortcut" data-mapping-id="${escape(row.id)}" title="${escape(row.url)}">
               <span class="shortcut-library-copy"><span class="chip-text">${escape(row.title)}</span><span class="shortcut-library-url">${escape(row.url)}</span></span>
               <span class="shortcut-open-state${state.opened ? ' is-open' : ''}">${escape(state.text)}</span>
-              <span class="shortcut-library-arrow" aria-hidden="true">↗</span></button>`;
+              <span class="shortcut-library-arrow" aria-hidden="true">↗</span></button></div>`;
           }).join('')}</div>
         </div>
       </section>`).join('')}</div>`;
