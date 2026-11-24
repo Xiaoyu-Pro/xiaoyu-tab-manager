@@ -19,7 +19,28 @@ async function screenshot(page, name) {
   await writeFile(join(directory, name), Buffer.from(result.data, 'base64'));
 }
 
-/** 在独立 Chrome 中检查默认关闭、保存失败、持久化、跨窗口与并发合并。 */
+/** 在隔离浏览器中确实停止扩展后台，验证下一次打开会经历全新的 worker。 */
+async function stopDashboardWorker(page, extensionBase) {
+  await page.send('ServiceWorker.enable');
+  let timeout;
+  const stopped = new Promise((resolve, reject) => {
+    timeout = setTimeout(() => reject(new Error('Xiaoyu test worker did not stop')), 8000);
+    page.on('ServiceWorker.workerVersionUpdated', ({ versions }) => {
+      if (versions.some(version => version.scriptURL === `${extensionBase}/background.js` && version.runningStatus === 'stopped')) {
+        clearTimeout(timeout);
+        resolve();
+      }
+    });
+  });
+  try {
+    await page.send('ServiceWorker.stopAllWorkers');
+    await stopped;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** 在独立 Chrome 中检查设置、跨窗口、后台休眠恢复与并发合并。 */
 export async function testDashboardCleanupBrowser(page, extensionBase) {
   await page.send('Emulation.clearDeviceMetricsOverride');
   await page.navigate(`${extensionBase}/index.html`);
@@ -55,11 +76,23 @@ export async function testDashboardCleanupBrowser(page, extensionBase) {
     assert.equal(await page.evaluate(`chrome.tabs.query({}).then(tabs => [${fixtures.first}, ${fixtures.second}].every(id => tabs.some(tab => tab.id === id)))`), true);
     await screenshot(page, 'dashboard-auto-cleanup-light.png');
 
-    const latest = await page.evaluate(`chrome.tabs.create({ url: 'chrome://newtab/', active: false }).then(tab => tab.id)`);
+    let latest = await page.evaluate(`chrome.tabs.create({ url: 'chrome://newtab/', active: false }).then(tab => tab.id)`);
     created.push(latest);
     await page.waitFor(`chrome.tabs.query({}).then(tabs => tabs.some(tab => tab.id === ${latest} && tab.status === 'complete') && !tabs.some(tab => [${fixtures.first}, ${fixtures.second}].includes(tab.id)))`, 10000);
     assert.equal(await page.evaluate(`chrome.tabs.query({}).then(tabs => [${current.id}, ${fixtures.web}, ${fixtures.tools}].every(id => tabs.some(tab => tab.id === id)))`), true);
     assert.equal(await page.evaluate(`document.querySelector('#tabOutDupeBanner').style.display`), 'none');
+
+    // 连续两次真正停止后台；旧通用新标签不刷新，新窗口中新开的页面仍须关闭它。
+    for (let cycle = 0; cycle < 2; cycle++) {
+      const old = latest;
+      const proof = await page.evaluate(`chrome.runtime.getContexts({contextTypes:['TAB']}).then(contexts => contexts.some(context => context.tabId === ${old} && context.frameId === 0 && context.documentUrl === ${JSON.stringify(`${extensionBase}/index.html`)}))`);
+      assert.equal(proof, true);
+      await stopDashboardWorker(page, extensionBase);
+      latest = await page.evaluate(`chrome.windows.create({ url: 'chrome://newtab/', focused: false }).then(window => window.tabs[0].id)`);
+      created.push(latest);
+      await page.waitFor(`chrome.tabs.query({}).then(tabs => tabs.some(tab => tab.id === ${latest} && tab.status === 'complete') && !tabs.some(tab => tab.id === ${old}))`, 10000);
+      assert.equal(await page.evaluate(`chrome.tabs.query({}).then(tabs => [${current.id}, ${fixtures.web}, ${fixtures.tools}].every(id => tabs.some(tab => tab.id === id)))`), true);
+    }
 
     // 重载较老的固定控制页，只验证持久设置，不能反过来删除最新页。
     await page.navigate(`${extensionBase}/index.html`);
@@ -90,7 +123,7 @@ export async function testDashboardCleanupBrowser(page, extensionBase) {
     await page.waitFor(`chrome.tabs.query({}).then(tabs => [${extra}, ${concurrent[1]}].every(id => tabs.some(tab => tab.id === id && tab.status === 'complete')))`);
     await page.waitFor('document.querySelector("#tabOutDupeBanner").style.display !== "none"');
     assert.deepEqual(page.errors, []);
-    console.log('Dashboard cleanup browser regression passed (toggle, write failure, persistence, cross-window, new-tab override, concurrency, protected tabs, responsive settings).');
+    console.log('Dashboard cleanup browser regression passed (toggle, write failure, persistence, cross-window, new-tab override, worker restart twice, concurrency, protected tabs, responsive settings).');
   } finally {
     await page.evaluate(`(() => { if (window.cleanupOriginalSet) { chrome.storage.local.set = window.cleanupOriginalSet; delete window.cleanupOriginalSet; } })()`);
     await page.evaluate(`chrome.storage.local.set({ dashboardAutoCleanupEnabled: false })`);

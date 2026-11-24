@@ -297,7 +297,7 @@
     return toClose;
   }
 
-  /** 后台串行合并仪表盘；临时顺序和身份只保存在当前 worker 内。 */
+  /** 后台串行合并仪表盘；临时顺序留在内存，旧页身份可向浏览器实时核验。 */
   function createDashboardCleanupController(chromeApi, { log = console } = {}) {
     const dashboardUrl = chromeApi.runtime.getURL('index.html');
     const tabs = new Map();
@@ -310,11 +310,12 @@
       return typeof url === 'string' && (url === dashboardUrl || url.startsWith(`${dashboardUrl}?`) || url.startsWith(`${dashboardUrl}#`));
     }
 
-    /** 通用新标签地址必须有页面就绪证明，挂起其他导航的页不参与。 */
-    function isDashboard(tab) {
+    /** 通用新标签须有就绪证明或本扩展顶层文档，挂起其他导航的页不参与。 */
+    function isDashboard(tab, liveDashboardIds) {
       return Number.isInteger(tab?.id) && !tab.incognito && !tab.pinned
         && (!tab.pendingUrl || tab.pendingUrl === tab.url)
-        && (isDocument(tab.url) || ((isBrowserNewTabUrl(tab.url) || tab.url === 'chrome://new-tab-page/') && tabs.get(tab.id)?.verified));
+        && (isDocument(tab.url) || ((isBrowserNewTabUrl(tab.url) || tab.url === 'chrome://new-tab-page/')
+          && (tabs.get(tab.id)?.verified || liveDashboardIds?.has(tab.id))));
     }
 
     /** 只读取严格开启的本地设置，不修改设置或会话存储。 */
@@ -349,14 +350,14 @@
     function cancel() { generation++; }
 
     /** 保留页消失、导航或受保护时终止，不能清空全部仪表盘。 */
-    async function keeperExists(id) {
+    async function keeperExists(id, liveDashboardIds) {
       try {
         const tab = await chromeApi.tabs.get(id);
-        return isDashboard(tab) && await isNormal(tab);
+        return isDashboard(tab, liveDashboardIds) && await isNormal(tab);
       } catch { return false; }
     }
 
-    /** 验证就绪页，再逐个关闭旧仪表盘；后台重启后以本次确认的页面为起点。 */
+    /** 验证就绪页及仍存活的顶层文档，后台重启后也能识别旧新标签并安全合并。 */
     async function cleanup(sender, revision) {
       const current = await chromeApi.tabs.get(sender.tab.id);
       const configured = await enabled();
@@ -368,7 +369,12 @@
       if (!tabs.has(current.id)) tabs.set(current.id, { order: ++sequence });
       tabs.get(current.id).verified = true;
       if (!configured) return { ok: true, enabled: false, closed: 0 };
-      const candidates = (await chromeApi.tabs.query({ windowType: 'normal' })).filter(isDashboard);
+      const contexts = typeof chromeApi.runtime.getContexts === 'function'
+        ? await chromeApi.runtime.getContexts({ contextTypes: ['TAB'] }) : [];
+      const liveDashboardIds = new Set(contexts
+        .filter(context => context.frameId === 0 && isDocument(context.documentUrl))
+        .map(context => context.tabId));
+      const candidates = (await chromeApi.tabs.query({ windowType: 'normal' })).filter(tab => isDashboard(tab, liveDashboardIds));
       candidates.sort((a, b) => (tabs.get(b.id)?.order || 0) - (tabs.get(a.id)?.order || 0));
       const keeper = candidates[0];
       if (!keeper || !tabs.get(keeper.id)?.verified) return { ok: true, enabled: true, closed: 0, deferred: true };
@@ -378,8 +384,8 @@
         if (candidate.id === keeper.id) continue;
         let fresh;
         try { fresh = await chromeApi.tabs.get(candidate.id); } catch { continue; }
-        if (!isDashboard(fresh) || !await isNormal(fresh)) continue;
-        if (!await keeperExists(keeper.id)) return { ok: false, enabled: true, closed, reason: 'keeper-changed' };
+        if (!isDashboard(fresh, liveDashboardIds) || !await isNormal(fresh)) continue;
+        if (!await keeperExists(keeper.id, liveDashboardIds)) return { ok: false, enabled: true, closed, reason: 'keeper-changed' };
         if (revision !== generation || !await enabled() || revision !== generation) break;
         try { await chromeApi.tabs.remove(fresh.id); closed++; }
         catch { failed++; log.warn('[Xiaoyu dashboard cleanup] Tab kept after close failure', { tabId: fresh.id }); }

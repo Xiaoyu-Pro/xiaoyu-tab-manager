@@ -1,5 +1,20 @@
 # 仪表盘自动合并验证
 
+## 2026-11-24：修复后台休眠后漏合并
+
+- 反馈：自动合并已开启，连续新开有效，间隔一段时间后旧 Xiaoyu 页面不会关闭。
+- 根因：通用 `chrome://newtab/` 的页面身份证明只保存在 worker 内存；后台休眠或重启后丢失，而旧页面不会重新发送初始化消息。
+- 修复：清理时通过 `chrome.runtime.getContexts({contextTypes: ['TAB']})` 查询存活的本扩展顶层仪表盘文档，只为候选识别提供即时证明。不增加模块、权限、持久化缓存，不改网页精确 URL 防重、设置、UI 或 Blue。新保留页仍必须发出就绪消息。
+- 单元回归已确认旧实现失败（预期关闭旧 tab 1，实际未关闭），修复后 `npm test` 通过；覆盖后台重建、其他扩展、子框架、挂起导航、上下文查询失败及旧接口兼容。
+- 独立 Chrome 中连续两次实际停止扩展后台，再跨窗口打开 `chrome://newtab/`，旧页不刷新也能被合并，固定控制页、普通网页及 Tools 均保留。专项与最终整套浏览器回归均通过。
+- 首次整套回归在既有 Tools 图标加载断言处遇到未等待渲染的时序失败（尚未运行本次新增场景）；未修改相关源码或降低断言，随后完整重跑通过。
+- Xiaoyu 防重 15 通过；Blue 防重 14 通过、1 个既有跳过。`git diff --check`、专项 OpenSpec 严格验证和 12 项主规格验证通过。
+- Chrome 接口依据：[runtime.getContexts 官方文档](https://developer.chrome.com/docs/extensions/reference/api/runtime#method-getContexts)。页面标识来自浏览器 API，不读取用户网页内容，不输出 URL 或标题日志。
+- 修复分支：`yzh/fix/dashboard-cleanup-wakeup`，从保留分组颜色的 `122a683` 基线开发；不合并或直接推送 main。交付时只同步本次增量到原加载目录，不操作用户浏览器标签；用户需在扩展管理页重新加载 Xiaoyu。
+- 交付核验：原加载目录与公开仓库 8 个任务文件一致，38 个 Blue 文件未变；两处单元测试、打包及扩展校验均通过，所有 OpenSpec 严格校验 25 项通过。旧 Chrome / Edge 1.0.10 安装包备份位于 `/tmp/xiaoyu-cleanup-wakeup-packages-HHnk45/{public,original}/`。
+
+## 2026-11-23：初始功能与精简验证
+
 日期：2026-11-23。实现、专项自审和验证完成，未遗留本次已知功能问题。
 
 ## 行为与边界

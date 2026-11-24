@@ -10,7 +10,7 @@ const DASHBOARD = 'chrome-extension://xiaoyu/index.html';
 function fixture(enabled = true) {
   const local = { [ENABLED_KEY]: enabled };
   const calls = [];
-  const state = { failRead: false, failRemove: false, beforeGet: null };
+  const state = { failRead: false, failRemove: false, beforeGet: null, contexts: [], failContexts: false };
   const windows = new Map([[1, { type: 'normal' }], [2, { type: 'normal' }],
     [3, { type: 'normal', incognito: true }], [4, { type: 'popup' }]]);
   const tabs = new Map([
@@ -25,7 +25,9 @@ function fixture(enabled = true) {
     [9, { id: 9, windowId: 1, url: DASHBOARD, pendingUrl: 'https://example.test/new' }],
   ]);
   const api = {
-    runtime: { id: 'xiaoyu', getURL: path => `chrome-extension://xiaoyu/${path}` },
+    runtime: { id: 'xiaoyu', getURL: path => `chrome-extension://xiaoyu/${path}`,
+      getContexts: async filter => { assert.deepEqual(filter, { contextTypes: ['TAB'] });
+        if (state.failContexts) throw new Error('contexts unavailable'); return state.contexts; } },
     storage: {
       local: { get: async key => { if (state.failRead) throw new Error('storage unavailable'); return { [key]: local[key] }; } },
     },
@@ -106,6 +108,37 @@ async function testPlaceholderProof() {
   assert.deepEqual(g.calls, []);
 }
 
+/** 后台重启后从浏览器核验旧新标签，未知文档、子框架和导航中的页面仍受保护。 */
+async function testWorkerRestart() {
+  const f = fixture(false);
+  f.tabs.get(1).url = 'chrome://newtab/';
+  await f.run.onReady(sender(1));
+  f.local[ENABLED_KEY] = true;
+  f.state.contexts = [
+    { contextType: 'TAB', frameId: 0, tabId: 1, documentUrl: `${DASHBOARD}?old#restored` },
+    { contextType: 'TAB', frameId: 0, tabId: 3, documentUrl: 'chrome-extension://blue/index.html' },
+    { contextType: 'TAB', frameId: 1, tabId: 4, documentUrl: DASHBOARD },
+    { contextType: 'TAB', frameId: 0, tabId: 9, documentUrl: DASHBOARD },
+  ];
+  for (const id of [3, 4, 9]) f.tabs.get(id).url = 'chrome://newtab/';
+  f.run = createController(f.api, { log: { info: (...args) => f.logs.push(args), warn: (...args) => f.logs.push(args) } });
+  f.run.onCreated(f.tabs.get(2));
+  const result = await f.run.onReady(sender(2));
+  assert.equal(result.ok, true);
+  assert.deepEqual(f.calls, [1]);
+  for (const id of [2, 3, 4, 9]) assert.equal(f.tabs.has(id), true);
+
+  const unavailable = fixture();
+  unavailable.state.failContexts = true;
+  assert.equal((await unavailable.run.onReady(sender(2))).ok, false);
+  assert.deepEqual(unavailable.calls, []);
+
+  const legacy = fixture();
+  delete legacy.api.runtime.getContexts;
+  assert.equal((await legacy.run.onReady(sender(2))).ok, true);
+  assert.deepEqual(legacy.calls, [1]);
+}
+
 /** 设置读取失败，或目标、开关和保留页变更时不冒险继续关闭。 */
 async function testFailureAndRechecks() {
   for (const scenario of ['read', 'keeper-gone', 'keeper-gone-late', 'target-navigated', 'target-pinned', 'target-popup', 'disabled']) {
@@ -153,6 +186,7 @@ export async function testDashboardCleanup() {
   await testModesAndScope();
   await testOrdering();
   await testPlaceholderProof();
+  await testWorkerRestart();
   await testFailureAndRechecks();
   await testConcurrentCreation();
 }
