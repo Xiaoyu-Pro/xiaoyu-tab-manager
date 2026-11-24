@@ -284,18 +284,25 @@ export async function testKeywordSearch(page, extensionBase) {
     await page.evaluate(`document.querySelector('[data-theme-name="midnight"]').click()`);
     await page.waitFor('document.documentElement.dataset.theme === "midnight"');
     await screenshot(page, 'keyword-search-dark.png');
-    for (const width of [1365, 1024, 768, 390]) {
+    for (const width of [1365, 1024, 980, 960, 768, 390]) {
       await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
       const layout = await page.evaluate(`(() => {
         const search = document.querySelector('#keywordSearch').getBoundingClientRect();
         const greeting = document.querySelector('.header-left').getBoundingClientRect();
         const settings = document.querySelector('.header-right').getBoundingClientRect();
-        return { left: search.left, right: search.right, top: search.top, greetingRight: greeting.right,
-          greetingBottom: greeting.bottom, settingsLeft: settings.left, settingsBottom: settings.bottom };
+        return { left: search.left, right: search.right, bottom: search.bottom,
+          headerLeft: document.querySelector('.container > header').getBoundingClientRect().left,
+          greetingLeft: greeting.left, greetingTop: greeting.top, settingsLeft: settings.left, settingsTop: settings.top,
+          optionsClickable: Array.from(document.querySelectorAll('.keyword-search-option')).every(option => {
+            const rect = option.getBoundingClientRect();
+            return document.elementFromPoint(rect.right - 10, rect.top + rect.height / 2)?.closest('.keyword-search-option') === option;
+          }) };
       })()`);
       assert.ok(layout.left >= 0 && layout.right <= width, JSON.stringify(layout));
-      assert.ok(layout.top >= Math.max(layout.greetingBottom, layout.settingsBottom) - 1
-        || (layout.left >= layout.greetingRight && layout.right <= layout.settingsLeft), JSON.stringify(layout));
+      assert.ok(Math.abs(layout.left - layout.headerLeft) <= 1, JSON.stringify(layout));
+      assert.ok(layout.right <= layout.greetingLeft + 1 || layout.bottom <= layout.greetingTop + 1, JSON.stringify(layout));
+      assert.ok(layout.right <= layout.settingsLeft + 1 || layout.bottom <= layout.settingsTop + 1, JSON.stringify(layout));
+      assert.equal(layout.optionsClickable, true, JSON.stringify(layout));
     }
     await screenshot(page, 'keyword-search-mobile.png');
     await page.send('Emulation.clearDeviceMetricsOverride');
@@ -333,7 +340,7 @@ export async function testKeywordSearch(page, extensionBase) {
     await page.navigate(`${extensionBase}/index.html`);
     await page.waitFor('document.querySelector("#keywordSearchInput")');
     assert.deepEqual(page.errors, []);
-    console.log('Keyword search browser regression passed (CRUD, group colors, HEX/RGB, persistence, failures, swatch sync, keyboard, privacy, themes, 4 viewports).');
+    console.log('Keyword search browser regression passed (CRUD, group colors, HEX/RGB, persistence, failures, swatch sync, keyboard, privacy, themes, 6 viewports, top-left search).');
   } finally {
     await new Promise(resolve => server.close(resolve));
   }

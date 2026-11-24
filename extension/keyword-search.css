@@ -1,9 +1,10 @@
-/* 独立快捷搜索：沿用仪表盘的纸面色、字体和轻量描边。 */
+/* 独立快捷搜索固定优先排在左上，沿用仪表盘的纸面色、字体和轻量描边。 */
 .keyword-search {
   position: relative;
+  order: -1;
   width: min(420px, 38vw);
   min-width: 200px;
-  margin-left: auto;
+  margin-right: auto;
   color: var(--ink);
   font-family: var(--font-sans);
 }
@@ -49,6 +50,7 @@
 .keyword-manage-btn:hover { color: var(--ink); }
 .keyword-search-results {
   position: absolute;
+  z-index: 1;
   top: calc(100% + 8px);
   left: 0;
   right: 0;
@@ -213,14 +215,13 @@
 .shortcut-context-menu[hidden], .open-tabs-search-wrap[hidden] { display: none; }
 .shortcut-capture-btn { font-size: 19px; }
 body.privacy-mode .keyword-search, body.privacy-mode .keyword-dialog, body.privacy-mode .shortcut-context-menu, body.privacy-mode .shortcut-library-grid, body.privacy-mode .shortcut-library-toolbar { display: none; }
-@media (max-width: 950px) {
-  .container > header { flex-wrap: wrap; }
-  .keyword-search { order: 3; width: 100%; margin-left: 0; }
+@media (max-width: 980px) {
+  .container > header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; }
+  .keyword-search { width: 100%; margin-right: 0; grid-column: 1 / -1; }
   .container > header > .header-right { width: auto; margin-left: auto; }
 }
 @media (max-width: 480px) {
-  .container > header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px 12px; }
-  .container > header > .keyword-search { grid-column: 1 / -1; }
+  .container > header { gap: 18px 12px; }
   .container > header .header-left h1 { font-size: clamp(20px, 5.8vw, 28px); }
   .keyword-dialog-heading { padding: 10px 12px 10px 20px; }
   .keyword-dialog-body { padding: 8px 20px 20px; }
