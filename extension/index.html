@@ -295,7 +295,20 @@
       <h2 id="keywordManagerTitle" data-i18n="keywordManageTitle">Keyword mappings</h2>
       <button type="button" id="keywordManagerClose" class="keyword-close-btn" data-i18n-aria-label="keywordClose" aria-label="Close">×</button>
     </div>
+    <div class="keyword-dialog-body">
     <p class="keyword-note" id="keywordManagerHelp" data-i18n="keywordManagerHelp">Use the same keyword for multiple pages. Your mappings stay on this device.</p>
+    <form id="keywordGroupNameForm" class="keyword-group-name-form" hidden>
+      <label><span data-i18n="keywordGroupName">Group name</span><input id="keywordGroupName" name="groupName" required autocomplete="off"></label>
+      <button type="submit" class="keyword-primary" data-i18n="keywordGroupRenameSave">Save name</button>
+    </form>
+    <form id="keywordGroupColorForm" class="keyword-color-form" aria-labelledby="keywordGroupColorTitle" hidden>
+      <div class="keyword-color-heading"><strong id="keywordGroupColorTitle"></strong><button type="button" id="keywordGroupColorClose" data-i18n-aria-label="keywordClose" aria-label="Close">×</button></div>
+      <label><span data-i18n="keywordGroupColor">Group color</span><input type="color" id="keywordGroupColorPicker" value="#DDEBE3"></label>
+      <label><span>HEX / RGB</span><input id="keywordGroupColorCode" required autocomplete="off" spellcheck="false" maxlength="64" aria-describedby="keywordGroupColorHelp" placeholder="#DDEBE3 / rgb(221,235,227)"></label>
+      <span id="keywordGroupColorPreview" class="keyword-color-preview"></span>
+      <p id="keywordGroupColorHelp" class="keyword-note" data-i18n="keywordGroupColorHelp">Use #RGB, #RRGGBB or rgb(r, g, b), with channels from 0 to 255.</p>
+      <div class="keyword-form-actions"><button type="submit" class="keyword-primary" id="keywordGroupColorSave" data-i18n="keywordGroupColorSave">Save color</button><button type="button" id="keywordGroupColorReset" data-i18n="keywordGroupColorReset">Restore default</button></div>
+    </form>
     <form id="keywordMappingForm" class="keyword-mapping-form">
       <label><span data-i18n="keywordField">Keyword</span><input id="keywordMappingKeyword" name="keyword" list="keywordMappingKeywords" required autocomplete="off" data-i18n-placeholder="keywordFieldPlaceholder" placeholder="e.g. dashboards"></label>
       <datalist id="keywordMappingKeywords"></datalist>
@@ -307,22 +320,14 @@
         <button type="button" id="keywordMappingCancel" data-i18n="keywordCancelEdit" hidden>Cancel edit</button>
       </div>
     </form>
-    <form id="keywordGroupColorForm" class="keyword-color-form" aria-labelledby="keywordGroupColorTitle" hidden>
-      <div class="keyword-color-heading"><strong id="keywordGroupColorTitle"></strong><button type="button" id="keywordGroupColorClose" data-i18n-aria-label="keywordClose" aria-label="Close">×</button></div>
-      <label><span data-i18n="keywordGroupColor">Group color</span><input type="color" id="keywordGroupColorPicker" value="#DDEBE3"></label>
-      <label><span>HEX / RGB</span><input id="keywordGroupColorCode" required autocomplete="off" spellcheck="false" maxlength="64" aria-describedby="keywordGroupColorHelp" placeholder="#DDEBE3 / rgb(221,235,227)"></label>
-      <span id="keywordGroupColorPreview" class="keyword-color-preview"></span>
-      <p id="keywordGroupColorHelp" class="keyword-note" data-i18n="keywordGroupColorHelp">Use #RGB, #RRGGBB or rgb(r, g, b), with channels from 0 to 255.</p>
-      <div class="keyword-form-actions"><button type="submit" class="keyword-primary" id="keywordGroupColorSave" data-i18n="keywordGroupColorSave">Save color</button><button type="button" id="keywordGroupColorReset" data-i18n="keywordGroupColorReset">Restore default</button></div>
-    </form>
     <p id="keywordManagerStatus" class="keyword-note" role="status" aria-live="polite"></p>
-    <div class="keyword-backup-tools">
+    <div class="keyword-backup-tools keyword-global-only">
       <button type="button" id="keywordExport" data-i18n="keywordExport">Export backup</button>
       <button type="button" id="keywordImport" data-i18n="keywordImport">Import backup</button>
       <input type="file" id="keywordImportFile" accept=".json,application/json" hidden>
     </div>
-    <p class="keyword-note" data-i18n="keywordBackupPrivacy">Backups contain full URLs. Keep internal links private.</p>
-    <section id="keywordImportPreview" class="keyword-import-preview" aria-labelledby="keywordImportPreviewTitle" hidden>
+    <p class="keyword-note keyword-global-only" data-i18n="keywordBackupPrivacy">Backups contain full URLs. Keep internal links private.</p>
+    <section id="keywordImportPreview" class="keyword-import-preview keyword-global-only" aria-labelledby="keywordImportPreviewTitle" hidden>
       <strong id="keywordImportPreviewTitle" data-i18n="keywordImportPreviewTitle">Review import</strong>
       <p id="keywordImportSummary" class="keyword-note" role="status"></p>
       <div class="keyword-form-actions">
@@ -331,6 +336,7 @@
       </div>
     </section>
     <div id="keywordMappingList" class="keyword-mapping-list"></div>
+    </div>
   </dialog>
   <div id="shortcutContextMenu" class="shortcut-context-menu" role="menu" hidden>
     <button type="button" role="menuitem" id="shortcutNewCopy" data-i18n="shortcutNewCopy">Open a new copy</button>

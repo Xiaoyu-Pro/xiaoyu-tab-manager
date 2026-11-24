@@ -84,7 +84,116 @@ async function testBackup(page, base) {
   await page.evaluate(`document.querySelector('#keywordManagerClose').click()`);
 }
 
-/** 在独立 Chrome 配置验证快捷卡片、别名、精确复用、收录与安全备份。 */
+/** 验证卡片直达分组编辑、原子改名、子项操作，以及正文底部仍可真实点击关闭。 */
+async function testGroupEditor(page, extensionBase, base) {
+  const before = await page.evaluate(`(async () => ({ data: await chrome.storage.local.get(['keywordPageMappings', 'keywordGroupColors']),
+    theme: localStorage.getItem('tab-out-theme'), language: localStorage.getItem('tab-out-language'),
+    tabs: (await chrome.tabs.query({})).length }))()`);
+  try {
+    await page.evaluate(`document.querySelector('[data-action="color-shortcut-group"][data-keyword="看板"]').focus()`);
+    await press(page, 'Enter', 13);
+    await page.waitFor('document.activeElement.id === "keywordGroupColorCode" && document.querySelectorAll(".keyword-mapping-row").length === 2');
+    assert.equal(await page.evaluate(`document.querySelector('#keywordGroupName').value`), '看板');
+    assert.equal(await page.evaluate(`document.querySelector('#keywordMappingKeyword').closest('label').hidden`), true);
+    assert.equal(await page.evaluate(`getComputedStyle(document.querySelector('.keyword-backup-tools')).display`), 'none');
+    await page.evaluate(`document.querySelector('#keywordGroupColorCode').value = 'rgb(210,230,220)'; document.querySelector('#keywordGroupColorForm').requestSubmit()`);
+    await page.waitFor('document.querySelector("#keywordManagerStatus").textContent.includes("updated") && !document.querySelector("#keywordGroupColorSave").disabled');
+    await page.waitFor(`document.querySelector('[data-action="color-shortcut-group"][data-keyword="看板"] .keyword-group-swatch').style.backgroundColor === 'rgb(210, 230, 220)'`);
+
+    await page.evaluate(`document.querySelector('[data-mapping-action="edit"][data-mapping-id="legacy"]').click();
+      document.querySelector('#keywordMappingTitle').value = 'Edited <ARGALL>';
+      document.querySelector('#keywordGroupName').value = 'tce'; document.querySelector('#keywordGroupNameForm').requestSubmit()`);
+    await page.waitFor('document.querySelector("#keywordManagerStatus").textContent.includes("already in use")');
+    assert.equal(await page.evaluate(`document.querySelector('#keywordGroupName').value`), 'tce');
+    assert.equal(await page.evaluate(`document.querySelector('#keywordMappingTitle').value`), 'Edited <ARGALL>');
+    await page.evaluate(`window.editorOriginalSet = SuperTabOutStorage.set; SuperTabOutStorage.set = async () => { throw new Error('test quota'); };
+      document.querySelector('#keywordGroupName').value = 'Observability'; document.querySelector('#keywordGroupNameForm').requestSubmit()`);
+    await page.waitFor('document.querySelector("#keywordManagerStatus").textContent.includes("Could not save")');
+    assert.equal(await page.evaluate(`document.querySelector('#keywordGroupName').value`), 'Observability');
+    assert.equal(await page.evaluate(`chrome.storage.local.get('keywordPageMappings').then(data => data.keywordPageMappings.find(row => row.id === 'legacy').keyword)`), '看板');
+    await page.evaluate(`SuperTabOutStorage.set = window.editorOriginalSet; delete window.editorOriginalSet;
+      document.querySelector('#keywordGroupNameForm').requestSubmit()`);
+    await page.waitFor('document.querySelector("#keywordManagerTitle").textContent.includes("Observability") && !document.querySelector("#keywordMappingSave").disabled');
+    assert.equal(await page.evaluate(`document.querySelector('#keywordMappingTitle').value`), 'Edited <ARGALL>');
+    assert.equal(await page.evaluate(`document.querySelector('#keywordMappingKeyword').value`), 'Observability');
+    assert.deepEqual(await page.evaluate(`chrome.storage.local.get('keywordGroupColors').then(data => data.keywordGroupColors)`), { observability: '#D2E6DC' });
+    await page.evaluate(`document.querySelector('#keywordMappingAliases').value = ['new-alias', '主链路'].join(String.fromCharCode(10));
+      document.querySelector('#keywordMappingUrl').value = ${JSON.stringify(`${base}/edited?b=2&a=1#exact`)}; document.querySelector('#keywordMappingForm').requestSubmit()`);
+    await page.waitFor('document.querySelector("#keywordManagerStatus").textContent.startsWith("Saved.") && !document.querySelector("#keywordMappingSave").disabled');
+    assert.deepEqual(await page.evaluate(`chrome.storage.local.get('keywordPageMappings').then(data => data.keywordPageMappings.find(row => row.id === 'legacy').aliases)`), ['new-alias', '主链路']);
+    assert.equal(await page.evaluate(`chrome.storage.local.get('keywordPageMappings').then(data => data.keywordPageMappings.find(row => row.id === 'legacy').url)`), `${base}/edited?b=2&a=1#exact`);
+    await page.evaluate(`document.querySelector('#keywordMappingTitle').value = 'Added page';
+      document.querySelector('#keywordMappingUrl').value = ${JSON.stringify(`${base}/editor?b=2&a=1#exact`)}; document.querySelector('#keywordMappingForm').requestSubmit()`);
+    await page.waitFor('document.querySelectorAll(".keyword-mapping-row").length === 3 && !document.querySelector("#keywordMappingSave").disabled');
+    await page.evaluate(`Array.from(document.querySelectorAll('.keyword-mapping-row')).find(row => row.textContent.includes('Added page')).querySelector('[data-mapping-action="delete"]').click()`);
+    assert.equal(await page.evaluate(`document.querySelectorAll('.keyword-mapping-row').length`), 3);
+    await page.evaluate(`document.querySelector('[data-confirm="true"]').click()`);
+    await page.waitFor('document.querySelectorAll(".keyword-mapping-row").length === 2 && !document.querySelector("#keywordMappingSave").disabled');
+    await page.evaluate(`document.querySelector('#keywordManagerClose').click()`);
+    await search(page, 'Observability');
+    await page.waitFor(`document.querySelectorAll('.keyword-search-option').length === 2 && Array.from(document.querySelectorAll('.keyword-result-tag')).every(tag => tag.textContent === 'Observability' && tag.style.backgroundColor === 'rgb(210, 230, 220)')`);
+    await page.navigate(`${extensionBase}/index.html`);
+    await page.waitFor('document.querySelector("[data-action=edit-shortcut-group][data-keyword=Observability]")');
+    await page.evaluate(`document.querySelector('[data-action="edit-shortcut-group"][data-keyword="Observability"]').click()`);
+    await page.waitFor('document.activeElement.id === "keywordGroupName" && document.querySelectorAll(".keyword-mapping-row").length === 2');
+    assert.equal(await page.evaluate(`document.querySelector('#keywordGroupColorCode').value`), '#D2E6DC');
+    for (const theme of ['white', 'midnight']) {
+      await page.evaluate(`document.querySelector('[data-theme-name="${theme}"]').click(); document.querySelector('[data-language="zh"]').click()`);
+      assert.match(await page.evaluate(`document.querySelector('#keywordManagerTitle').textContent`), /编辑分组/);
+      for (const width of [1365, 768, 390]) {
+        await page.send('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: false });
+        const layout = await page.evaluate(`(() => { const dialog = document.querySelector('#keywordManager');
+          const body = dialog.querySelector('.keyword-dialog-body'); body.scrollTop = body.scrollHeight;
+          const close = document.querySelector('#keywordManagerClose').getBoundingClientRect();
+          return { overflow: dialog.scrollWidth > dialog.clientWidth || body.scrollWidth > body.clientWidth,
+            visible: close.top >= 0 && close.bottom <= innerHeight, scrollable: body.scrollHeight > body.clientHeight,
+            clickable: document.elementFromPoint(close.x + close.width/2, close.y + close.height/2)?.id === 'keywordManagerClose' }; })()`);
+        assert.deepEqual(layout, { overflow: false, visible: true, scrollable: true, clickable: true });
+        if (width !== 768) await screenshot(page, `shortcut-group-editor-${theme}-${width}.png`);
+      }
+    }
+    const point = await page.evaluate(`(() => { const rect = document.querySelector('#keywordManagerClose').getBoundingClientRect(); return {x:rect.x+rect.width/2,y:rect.y+rect.height/2}; })()`);
+    await page.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'left', clickCount: 1 });
+    await page.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 });
+    await page.waitFor('!document.querySelector("#keywordManager").open');
+    await page.send('Emulation.clearDeviceMetricsOverride');
+    await page.evaluate(`document.querySelector('[data-language="en"]').click(); document.querySelector('#keywordManageBtn').click()`);
+    await page.waitFor('document.querySelectorAll(".keyword-mapping-row").length === 3');
+    assert.equal(await page.evaluate(`document.querySelector('#keywordGroupNameForm').hidden`), true);
+    assert.notEqual(await page.evaluate(`getComputedStyle(document.querySelector('.keyword-backup-tools')).display`), 'none');
+    await page.evaluate(`(async () => { const saved = await chrome.storage.local.get('keywordPageMappings');
+      await chrome.storage.local.set({ keywordPageMappings: [...saved.keywordPageMappings,
+        ...Array.from({ length: 12 }, (_, index) => ({ id: 'scroll-' + index, keyword: 'Scroll group ' + index,
+          title: 'Synthetic page', url: ${JSON.stringify(base)} + '/scroll-' + index, aliases: [] }))] }); })()`);
+    await page.waitFor('document.querySelectorAll(".keyword-mapping-group").length === 14');
+    for (const width of [1365, 390]) {
+      await page.send('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: false });
+      const layout = await page.evaluate(`(() => { const body = document.querySelector('#keywordManager .keyword-dialog-body');
+        body.scrollTop = body.scrollHeight; const close = document.querySelector('#keywordManagerClose').getBoundingClientRect();
+        return { scrolled: body.scrollTop > 0, visible: close.top >= 0 && close.bottom <= innerHeight,
+          clickable: document.elementFromPoint(close.x + close.width/2, close.y + close.height/2)?.id === 'keywordManagerClose' }; })()`);
+      assert.deepEqual(layout, { scrolled: true, visible: true, clickable: true });
+    }
+    await press(page, 'Escape', 27);
+    await page.waitFor('!document.querySelector("#keywordManager").open');
+    assert.equal(await page.evaluate(`chrome.tabs.query({}).then(tabs => tabs.length)`), before.tabs);
+    console.log('Shortcut group editor browser regression passed (direct entry, HEX/RGB, rename, drafts, conflict, save failure, child CRUD, persistence, 2 themes, 3 viewports, real close click).');
+  } finally {
+    await page.send('Emulation.clearDeviceMetricsOverride');
+    await page.evaluate(`(() => { if (window.editorOriginalSet) { SuperTabOutStorage.set = window.editorOriginalSet; delete window.editorOriginalSet; }
+      if (document.querySelector('#keywordManager').open) document.querySelector('#keywordManager').close(); })()`);
+    await page.evaluate(`(async () => { const before = ${JSON.stringify(before)};
+      await chrome.storage.local.set(before.data);
+      if (!Object.hasOwn(before.data, 'keywordGroupColors')) await chrome.storage.local.remove('keywordGroupColors');
+      for (const [key,value] of [['tab-out-theme',before.theme],['tab-out-language',before.language]]) {
+        if (value === null) localStorage.removeItem(key); else localStorage.setItem(key,value);
+      } })()`);
+    await page.navigate(`${extensionBase}/index.html`);
+    await page.waitFor('document.querySelectorAll(".shortcut-library-row").length === 3');
+  }
+}
+
+/** 在独立 Chrome 配置验证快捷卡片、分组编辑、别名、精确复用、收录与安全备份。 */
 export async function testShortcutLibraryBrowser(page, extensionBase) {
   const server = createServer((_request, response) => {
     response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -125,6 +234,7 @@ export async function testShortcutLibraryBrowser(page, extensionBase) {
     assert.equal(await page.evaluate(`getComputedStyle(document.querySelector('#openTabsMissions')).columnCount`), 'auto');
     assert.equal(await page.evaluate(`(() => { const toolbar = document.querySelector('.shortcut-library-toolbar').getBoundingClientRect();
       const grid = document.querySelector('.shortcut-library-grid').getBoundingClientRect(); return grid.top >= toolbar.bottom; })()`), true);
+    await testGroupEditor(page, extensionBase, base);
     await screenshot(page, 'shortcut-library-light.png');
     await page.navigate(`${extensionBase}/index.html`);
     await page.waitFor('document.querySelectorAll(".shortcut-library-row").length === 3');

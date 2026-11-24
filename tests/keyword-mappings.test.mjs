@@ -58,9 +58,53 @@ async function testGroupColors() {
   }
 }
 
-/** 回归分组配色、跨组匹配、完整网址、增改删持久化及失败隔离。 */
+/** 分组重命名原子更新颜色和全部子项，冲突或失败时不覆盖现有数据。 */
+async function testGroupRename() {
+  const data = { keywordPageMappings: [
+    { id: 'first', keyword: 'Old Group', title: 'A', url: 'https://example.test/a?b=2&a=1#x', aliases: ['ag'] },
+    { id: 'other', keyword: 'Other', title: 'B', url: 'https://example.test/b', aliases: [] },
+    { id: 'last', keyword: 'old group', title: 'C', url: 'https://example.test/c', aliases: ['alias'] },
+  ], keywordGroupColors: { 'old group': '#ABCDEF', other: '#112233' } };
+  let failWrite = false;
+  const writes = [];
+  const service = mappings.createService({
+    /** 返回隔离快照，保证失败不能通过共享引用修改状态。 */
+    async get(key) { return structuredClone({ [key]: data[key] }); },
+    /** 用单次键集合检验映射和颜色一起提交，允许注入失败。 */
+    async set(value) { if (failWrite) throw new Error('quota'); writes.push(Object.keys(value)); Object.assign(data, structuredClone(value)); },
+  });
+  const before = await service.list();
+  assert.deepEqual(await service.renameGroup(' OLD group ', ' New   Group '), { keyword: 'New Group', count: 2 });
+  assert.deepEqual(writes, [[mappings.STORAGE_KEY, mappings.GROUP_COLORS_KEY]]);
+  assert.deepEqual(await service.list(), before.map(row => ({ ...row, keyword: row.id === 'other' ? 'Other' : 'New Group' })));
+  assert.deepEqual(await service.getGroupColors(), { other: '#112233', 'new group': '#ABCDEF' });
+  const snapshot = structuredClone(data);
+  for (const [oldName, newName, error] of [['New Group', ' Other ', /keywordGroupExists/],
+    ['missing', 'Free', /keywordGroupMissing/], ['New Group', ' ', /keywordRequired/]]) {
+    await assert.rejects(service.renameGroup(oldName, newName), error);
+    assert.deepEqual(data, snapshot);
+  }
+  failWrite = true;
+  await assert.rejects(service.renameGroup('New Group', 'Retry'), /quota/);
+  assert.deepEqual(data, snapshot);
+  failWrite = false;
+  await service.renameGroup('New Group', 'NEW GROUP');
+  assert.equal((await service.list())[0].keyword, 'NEW GROUP');
+  assert.equal((await service.getGroupColors())['new group'], '#ABCDEF');
+  const defaultColor = mappings.getGroupColor('Other');
+  delete data.keywordGroupColors.other;
+  await service.renameGroup('Other', '__proto__');
+  assert.equal(mappings.getGroupColor('__proto__', await service.getGroupColors()), defaultColor);
+  data.keywordGroupColors['new group'] = 'not-a-color';
+  const damaged = structuredClone(data);
+  await assert.rejects(service.renameGroup('NEW GROUP', 'No loss'), /keywordGroupColorLoadError/);
+  assert.deepEqual(data, damaged);
+}
+
+/** 回归分组配色、改名、跨组匹配、完整网址、增改删持久化及失败隔离。 */
 export async function testKeywordMappings() {
   await testGroupColors();
+  await testGroupRename();
   const data = {};
   let failWrite = false;
   let nextId = 0;

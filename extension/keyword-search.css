@@ -99,8 +99,8 @@
   max-height: calc(100vh - 48px);
   box-sizing: border-box;
   margin: auto;
-  padding: 26px;
-  overflow-y: auto;
+  padding: 0;
+  overflow: hidden;
   border: 1px solid var(--hairline);
   border-radius: 16px;
   background: var(--surface-raised);
@@ -109,10 +109,21 @@
   font-family: var(--font-sans);
 }
 .keyword-dialog::backdrop { background: color-mix(in srgb, var(--ink) 20%, transparent); backdrop-filter: blur(4px); }
-.keyword-dialog-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.keyword-dialog[open] { display: flex; flex-direction: column; }
+.keyword-dialog-heading { display: flex; flex-shrink: 0; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 20px 14px 26px; border-bottom: 1px solid var(--hairline); }
+.keyword-dialog-heading h2 { min-width: 0; overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.keyword-dialog-body { min-height: 0; padding: 8px 26px 26px; overflow-y: auto; overscroll-behavior: contain; }
+.keyword-dialog[data-group-mode="true"] .keyword-global-only { display: none; }
+.keyword-dialog[data-group-mode="true"] .keyword-color-form { margin-top: 0; margin-bottom: 20px; }
+.keyword-dialog[data-group-mode="true"] .keyword-mapping-form { grid-template-columns: minmax(0, 1fr); }
 .keyword-dialog h2 { margin: 0; font: 500 21px var(--font-sans); }
 .keyword-dialog button { font: inherit; font-size: 12px; cursor: pointer; }
-.keyword-dialog .keyword-close-btn { border: 0; padding: 4px 9px; background: transparent; color: var(--muted); font-size: 24px; }
+.keyword-dialog .keyword-close-btn { flex-shrink: 0; min-width: 44px; min-height: 44px; border: 0; border-radius: 8px; padding: 4px 9px; background: transparent; color: var(--muted); font-size: 24px; }
+.keyword-dialog .keyword-close-btn:hover { background: var(--paper); color: var(--ink); }
+.keyword-group-name-form { display: flex; align-items: end; gap: 10px; margin: 0 0 18px; }
+.keyword-group-name-form label { display: grid; flex: 1; min-width: 0; gap: 7px; font-size: 12px; }
+.keyword-group-name-form input { width: 100%; min-width: 0; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 8px; background: var(--paper); color: var(--ink); font: inherit; font-size: 13px; }
+.keyword-group-name-form button { flex-shrink: 0; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 8px; background: color-mix(in srgb, var(--accent-sage) 18%, var(--surface-raised)); color: var(--ink); }
 .keyword-note { margin: 10px 0 18px; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .keyword-note:empty { display: none; }
 .keyword-note.is-error { color: var(--accent-terracotta, #b54c43); }
@@ -169,7 +180,7 @@
 .keyword-row-actions button { padding: 6px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); }
 .keyword-row-actions button:hover { background: var(--paper); color: var(--ink); }
 .keyword-row-actions button[data-confirm="true"] { color: var(--accent-terracotta, #b54c43); }
-.keyword-search button:focus-visible, .keyword-dialog button:focus-visible, .keyword-mapping-form input:focus-visible, .keyword-mapping-form textarea:focus-visible, .shortcut-library-row:focus-visible, .shortcut-context-menu button:focus-visible { outline: 2px solid var(--accent-sage); outline-offset: 2px; }
+.keyword-search button:focus-visible, .keyword-dialog button:focus-visible, .keyword-group-name-form input:focus-visible, .keyword-mapping-form input:focus-visible, .keyword-mapping-form textarea:focus-visible, .shortcut-library-row:focus-visible, .shortcut-group-color-trigger:focus-visible, .shortcut-group-edit:focus-visible, .shortcut-context-menu button:focus-visible { outline: 2px solid var(--accent-sage); outline-offset: 2px; }
 .keyword-backup-tools { display: flex; gap: 10px; padding-top: 14px; border-top: 1px solid var(--hairline); }
 .keyword-backup-tools button { border: 1px solid var(--hairline); border-radius: 7px; padding: 7px 11px; color: var(--ink); background: transparent; }
 .keyword-import-preview { padding: 14px; margin-bottom: 16px; border: 1px solid var(--hairline); border-radius: 10px; background: color-mix(in srgb, var(--accent-sage) 8%, var(--surface-raised)); }
@@ -180,6 +191,13 @@
 .shortcut-library-toolbar button { flex-shrink: 0; }
 .shortcut-library-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 18px; grid-column: 1 / -1; align-items: start; }
 .shortcut-library-card { min-width: 0; }
+.shortcut-group-heading { display: flex; align-items: center; min-width: 0; }
+.shortcut-group-heading .mission-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shortcut-group-color-trigger { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 30px; height: 30px; border: 0; border-radius: 6px; padding: 0; background: transparent; cursor: pointer; }
+.shortcut-group-color-trigger .keyword-group-swatch { margin: 0; }
+.shortcut-group-color-trigger:hover, .shortcut-group-edit:hover { background: var(--paper); }
+.shortcut-group-actions { display: flex; flex-shrink: 0; align-items: center; gap: 8px; }
+.shortcut-group-edit { border: 0; border-radius: 6px; padding: 7px 6px; background: transparent; color: var(--muted); font: 12px var(--font-sans); cursor: pointer; }
 .shortcut-library-row { display: flex; width: 100%; align-items: center; gap: 12px; border: 0; border-bottom: 1px solid var(--hairline); padding: 13px 0; background: transparent; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
 .shortcut-library-row:last-child { border-bottom: 0; }
 .shortcut-library-row:hover { background: color-mix(in srgb, var(--accent-sage) 7%, transparent); }
@@ -204,7 +222,8 @@ body.privacy-mode .keyword-search, body.privacy-mode .keyword-dialog, body.priva
   .container > header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px 12px; }
   .container > header > .keyword-search { grid-column: 1 / -1; }
   .container > header .header-left h1 { font-size: clamp(20px, 5.8vw, 28px); }
-  .keyword-dialog { padding: 20px; }
+  .keyword-dialog-heading { padding: 10px 12px 10px 20px; }
+  .keyword-dialog-body { padding: 8px 20px 20px; }
   .keyword-mapping-form { grid-template-columns: minmax(0, 1fr); }
   .keyword-mapping-row { flex-wrap: wrap; gap: 4px; }
   .keyword-row-actions { margin-left: auto; }

@@ -180,6 +180,29 @@
       });
     }
 
+    /** 锁内重命名整组并保留颜色，拒绝隐式合并；一次写入避免名称和配色分离。 */
+    function renameGroup(oldKeyword, newKeyword) {
+      return mutate(async () => {
+        const oldKey = normalizeKeyword(oldKeyword);
+        const keyword = typeof newKeyword === 'string' ? newKeyword.trim().replace(/\s+/g, ' ') : '';
+        const newKey = normalizeKeyword(keyword);
+        if (!oldKey || !newKey) throw new Error('keywordRequired');
+        const rows = await list();
+        const group = rows.filter(row => normalizeKeyword(row.keyword) === oldKey);
+        if (!group.length) throw new Error('keywordGroupMissing');
+        if (newKey !== oldKey && rows.some(row => normalizeKeyword(row.keyword) === newKey)) throw new Error('keywordGroupExists');
+        const colors = await getGroupColors();
+        const color = getGroupColor(oldKey, colors);
+        if (newKey !== oldKey) delete colors[oldKey];
+        await storage.set({
+          [STORAGE_KEY]: rows.map(row => normalizeKeyword(row.keyword) === oldKey ? { ...row, keyword } : row),
+          [GROUP_COLORS_KEY]: { ...colors, [newKey]: color },
+        });
+        console.info('[Xiaoyu shortcuts] Group rename persisted', { count: group.length });
+        return { keyword, count: group.length };
+      });
+    }
+
     /** 添加或更新单条映射；写入成功前不修改调用方列表。 */
     function save(draft) {
       return mutate(async () => {
@@ -231,7 +254,7 @@
       });
     }
 
-    return { list, save, remove, exportBackup, previewImport, importBackup, getGroupColors, setGroupColor };
+    return { list, save, remove, exportBackup, previewImport, importBackup, getGroupColors, setGroupColor, renameGroup };
   }
 
   const api = { STORAGE_KEY, GROUP_COLORS_KEY, MAX_BACKUP_BYTES, normalizeKeyword, normalizeAliases, validateMapping, findMappings, parseBackup, createService,
